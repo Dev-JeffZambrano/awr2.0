@@ -1,0 +1,341 @@
+---
+description: Arquitectura oficial de AWR con PHP, Eloquent y PostgreSQL
+alwaysApply: true
+---
+
+# AWR PHP - Arquitectura oficial
+
+AWR es un aplicativo web desarrollado con:
+
+- PHP
+- WampServer / Apache
+- PostgreSQL en Docker
+- Eloquent ORM mediante illuminate/database
+- Composer
+- HTML5
+- CSS
+- JavaScript
+- Axios
+
+Posteriormente incorporará:
+
+- Redpanda
+- ClickHouse
+- Power BI
+
+No implementar ni preparar esas tecnologías hasta que sean requeridas explícitamente.
+
+## Principio fundamental
+
+El proyecto crecerá únicamente cuando una funcionalidad lo requiera.
+
+Nunca crear archivos, carpetas, Models, Controllers, Services, configuraciones o módulos anticipadamente.
+
+Si se trabaja únicamente Login, solo deben existir o crearse archivos necesarios para Login.
+
+No preparar Facturación, Monitoreo, Inventario, Analítica, Redpanda, ClickHouse o Power BI anticipadamente.
+
+## Arquitectura
+
+El flujo principal será:
+
+Vista PHP
+→ JavaScript
+→ Axios
+→ Controller PHP
+→ switch(op)
+→ case
+→ Service solamente cuando sea necesario
+→ Model Eloquent
+→ PostgreSQL
+
+## Vistas
+
+Las vistas principales estarán directamente en la raíz del proyecto.
+
+Ejemplos futuros:
+
+login.php
+dashboardAdministrador.php
+dashboardAdministrativo.php
+dashboardOperador.php
+usuarios.php
+facturacion.php
+monitoreo.php
+
+No crear una carpeta independiente para cada vista.
+
+## CSS
+
+Todo CSS debe estar separado de PHP.
+
+Ubicación:
+
+public/css/
+
+Debe utilizarse un archivo global:
+
+public/css/variables.css
+
+con :root para:
+
+- colores
+- tipografía
+- espaciado
+- border radius
+- sombras
+- tamaños reutilizables
+
+Los archivos específicos deben tener nombres relacionados con la funcionalidad:
+
+login.css
+dashboard.css
+facturacion.css
+monitoreo.css
+
+No crear CSS de módulos inexistentes.
+
+## JavaScript
+
+Todo JavaScript de una funcionalidad debe vivir en:
+
+public/js/
+
+Ejemplos:
+
+login.js
+facturacion.js
+monitoreo.js
+
+JavaScript manejará:
+
+- eventos
+- DOM
+- validaciones visuales
+- Axios
+- modales
+- interacción
+
+La lógica de negocio crítica pertenece al backend.
+
+No colocar grandes bloques JavaScript dentro de PHP.
+
+## Controllers
+
+Ubicación:
+
+app/Controllers/
+
+Debe existir un Controller claramente relacionado con cada funcionalidad.
+
+Ejemplos:
+
+AuthController.php
+UsuarioController.php
+FacturacionController.php
+MonitoreoController.php
+
+Flujo esperado:
+
+1. cargar bootstrap.php
+2. iniciar o validar sesión
+3. validar autorización cuando corresponda
+4. leer JSON de entrada
+5. obtener op
+6. ejecutar switch
+7. ejecutar case
+8. responder JSON
+9. exit
+
+Los cases deben utilizar nombres descriptivos:
+
+iniciarSesion
+obtenerUsuarios
+guardarUsuario
+crearFactura
+obtenerMonitoreo
+
+Evitar case 1, case 2, etc.
+
+## Models
+
+Ubicación:
+
+app/Models/
+
+Utilizar Eloquent.
+
+Los Models pueden declarar:
+
+$table
+$primaryKey
+$timestamps
+$casts
+relaciones
+
+No crear Models que todavía no sean utilizados.
+
+## Services
+
+Ubicación futura:
+
+app/Services/
+
+Los Services NO son obligatorios.
+
+Usar:
+
+Controller → Model
+
+para lógica sencilla.
+
+Usar:
+
+Controller → Service → Model
+
+cuando exista lógica de negocio suficientemente compleja.
+
+No crear Services vacíos o innecesarios.
+
+## Configuración
+
+Actualmente existe:
+
+app/config/
+
+Mantener esta convención existente mientras funcione correctamente.
+
+No renombrar carpetas solo por razones estéticas.
+
+Crear nuevos archivos de configuración únicamente cuando sean realmente necesarios.
+
+## PostgreSQL
+
+PostgreSQL es la base de datos transaccional oficial de AWR.
+
+Se ejecuta mediante Docker.
+
+WampServer proporciona:
+
+Apache
+PHP
+
+La comunicación es:
+
+PHP / Eloquent
+→ PostgreSQL Docker
+
+No cambiar PostgreSQL por MySQL sin autorización explícita.
+
+## Seguridad
+
+Nunca guardar directamente en código:
+
+- contraseñas
+- usuarios sensibles
+- tokens
+- claves API
+- secretos
+
+Las variables sensibles deben estar en .env.
+
+.env jamás debe versionarse.
+
+Los Controllers deberán validar seguridad del lado servidor.
+
+Ocultar botones en frontend NO sustituye validación backend.
+
+## Axios
+
+AWR utilizará Axios para llamadas desde JavaScript hacia Controllers.
+
+Ejemplo conceptual:
+
+axios.post(
+    'app/Controllers/MonitoreoController.php',
+    {
+        op: 'obtenerEstado'
+    }
+)
+
+El Controller ejecutará:
+
+case 'obtenerEstado'
+
+Esto debe permitir rastrear fácilmente desde F12 / Network:
+
+Vista
+→ JS
+→ Controller
+→ case
+→ Model
+
+## Naming
+
+Los nombres deben corresponder directamente con la funcionalidad.
+
+Ejemplo:
+
+monitoreo.php
+monitoreo.js
+monitoreo.css
+MonitoreoController.php
+
+Evitar nombres genéricos como:
+
+handler.php
+manager.php
+functions2.php
+nuevo.php
+prueba2.php
+
+## Simplicidad
+
+Priorizar:
+
+- facilidad de entender
+- facilidad de localizar archivos
+- facilidad de mantener
+- facilidad de defender académicamente
+
+No introducir:
+
+Repository Pattern
+CQRS
+Clean Architecture
+Hexagonal Architecture
+capas abstractas innecesarias
+
+salvo solicitud explícita.
+
+## Modificaciones
+
+Antes de cambiar código:
+
+1. inspeccionar lo existente
+2. entender el flujo actual
+3. determinar el cambio mínimo
+4. reutilizar archivos existentes
+5. crear archivos únicamente cuando sean necesarios
+6. probar la funcionalidad
+
+No realizar refactorizaciones masivas mientras se desarrolla una funcionalidad.
+
+## Git
+
+No realizar commits automáticamente.
+
+No modificar historial Git sin autorización.
+
+## Regla máxima
+
+Si para resolver algo existen dos alternativas correctas, preferir la que produzca una arquitectura más simple y fácil de explicar.
+
+Una funcionalidad debe poder seguirse fácilmente por nombre:
+
+monitoreo.php
+→ monitoreo.js
+→ MonitoreoController.php
+→ Models relacionados
+
+Ese patrón debe mantenerse durante todo AWR.
