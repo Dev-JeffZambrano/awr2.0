@@ -51,6 +51,9 @@ switch ($op) {
     case 'iniciarSesion':
         iniciarSesion($entrada);
         break;
+    case 'cerrarSesion':
+        cerrarSesion();
+        break;
     default:
         responder(400, [
             'exito' => false,
@@ -128,6 +131,8 @@ function iniciarSesion(array $entrada): void
         $_SESSION = [
             'id_usuario' => (int) $usuario->id_usuario,
             'username' => (string) $usuario->username,
+            'nombres' => (string) $usuario->nombres,
+            'apellidos' => (string) $usuario->apellidos,
             'id_rol' => (int) $rol->id_rol,
             'rol' => $nombreRol,
         ];
@@ -142,6 +147,31 @@ function iniciarSesion(array $entrada): void
             'mensaje' => 'No se pudo iniciar sesión.',
         ]);
     }
+}
+
+function cerrarSesion(): void
+{
+    if (isset($_COOKIE[session_name()])) {
+        session_start();
+        $_SESSION = [];
+
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires' => time() - 42000,
+            'path' => $params['path'],
+            'domain' => $params['domain'],
+            'secure' => (bool) $params['secure'],
+            'httponly' => (bool) $params['httponly'],
+            'samesite' => $params['samesite'] ?? 'Lax',
+        ]);
+
+        session_destroy();
+    }
+
+    responder(200, [
+        'exito' => true,
+        'redireccion' => 'login.php',
+    ]);
 }
 
 function responder(int $codigo, array $cuerpo): void

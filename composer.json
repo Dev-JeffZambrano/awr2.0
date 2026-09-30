@@ -1,5 +1,5 @@
 {
-    "name": "jeff/awr",
+    "name": "dev-jeffzambrano/awr",
     "description": "Aplicativo Web Resiliente - Proyecto de tesis",
     "autoload": {
         "psr-4": {
@@ -8,8 +8,8 @@
     },
     "authors": [
         {
-            "name": "Ing-Jeff-Zambrano",
-            "email": "jzambranoj8@unemi.edu.ec"
+            "name": "Dev-JeffZambrano",
+            "email": "zambrano.jeff94@gmail.com"
         }
     ],
     "require": {

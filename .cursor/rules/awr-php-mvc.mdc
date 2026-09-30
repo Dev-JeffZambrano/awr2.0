@@ -321,6 +321,14 @@ Antes de cambiar código:
 
 No realizar refactorizaciones masivas mientras se desarrolla una funcionalidad.
 
+## Documentación
+
+La carpeta `documentacion/` en la raíz es el lugar de la documentación del proyecto y de sus diagramas.
+
+- Guardar ahí los documentos y los diagramas que se produzcan para la tesis o para el sistema.
+- Cada diagrama se guarda también como imagen PNG en esa misma carpeta.
+- No abrir otra carpeta de documentación salvo que se pida de forma explícita.
+
 ## Git
 
 No realizar commits automáticamente.

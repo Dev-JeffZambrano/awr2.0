@@ -1,19 +1,22 @@
 :root {
-    --color-fondo: #e7eef2;
+    --color-fondo: #e5edf6;
     --color-superficie: #ffffff;
-    --color-texto: #15202b;
-    --color-texto-suave: #5c6b78;
-    --color-primario: #0f4c5c;
-    --color-primario-activo: #0b3944;
-    --color-acento: #1a7f8c;
-    --color-panel: #0c1c24;
-    --color-panel-texto: #f4f8f9;
-    --color-panel-texto-suave: #b7c7cf;
-    --color-borde: #d5e0e7;
-    --color-error: #8d2e2e;
+    --color-texto: #102033;
+    --color-texto-suave: #52657c;
+    --color-primario: #1664f5;
+    --color-primario-activo: #0d4ecc;
+    --color-acento: #14c8e8;
+    --color-cian: #22d3ee;
+    --color-turquesa: #12b6c8;
+    --color-panel: #06111e;
+    --color-panel-profundo: #030a14;
+    --color-panel-texto: #f4f8fc;
+    --color-panel-texto-suave: #b7c6d8;
+    --color-borde: #d5e0ee;
+    --color-error: #9b2c2c;
     --color-error-fondo: #fdeeee;
-    --color-error-borde: #efc4c4;
-    --color-foco: #1a7f8c;
+    --color-error-borde: #f0c6c6;
+    --color-foco: #1664f5;
 
     --fuente-base: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     --peso-regular: 400;
@@ -21,8 +24,8 @@
     --peso-fuerte: 700;
     --tamano-texto: 1rem;
     --tamano-pequeno: 0.875rem;
-    --tamano-titulo: 1.75rem;
-    --tamano-marca: clamp(2.75rem, 6vw, 4.25rem);
+    --tamano-titulo: 1.65rem;
+    --tamano-marca: clamp(1.7rem, 2.4vw, 2.15rem);
     --interlineado: 1.5;
 
     --espacio-2xs: 0.25rem;
@@ -31,15 +34,16 @@
     --espacio-md: 1rem;
     --espacio-lg: 1.5rem;
     --espacio-xl: 2rem;
-    --espacio-2xl: 3rem;
-    --espacio-3xl: 4.5rem;
+    --espacio-2xl: 2.75rem;
+    --espacio-3xl: 3.25rem;
 
-    --radio-control: 0.5rem;
-    --radio-tarjeta: 1rem;
+    --radio-control: 0.75rem;
+    --radio-tarjeta: 1.35rem;
 
-    --sombra-tarjeta: 0 18px 48px rgba(12, 28, 36, 0.14);
-    --sombra-foco: 0 0 0 3px rgba(26, 127, 140, 0.28);
+    --sombra-tarjeta: 0 24px 56px rgba(10, 28, 58, 0.14);
+    --sombra-boton: 0 12px 26px rgba(22, 100, 245, 0.34);
+    --sombra-foco: 0 0 0 3px rgba(22, 100, 245, 0.24);
 
-    --alto-control: 2.875rem;
-    --ancho-tarjeta: 24.5rem;
+    --alto-control: 3rem;
+    --ancho-tarjeta: 26rem;
 }

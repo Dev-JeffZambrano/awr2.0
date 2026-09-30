@@ -45,14 +45,24 @@ if (isset($_COOKIE[session_name()])) {
 <body>
     <main class="acceso">
         <section class="acceso__identidad" aria-labelledby="nombre-awr">
-            <p class="acceso__sigla">AWR</p>
-            <h1 class="acceso__nombre" id="nombre-awr">Aplicativo Web Resiliente</h1>
-            <p class="acceso__resumen">Ingresa con tu usuario para continuar en el sistema.</p>
+            <div class="acceso__aire" aria-hidden="true"></div>
+            <div class="acceso__escena">
+                <img src="public/img/login/awr-login-bg.jpg" alt="">
+            </div>
+            <div class="acceso__cierre">
+                <h1 class="acceso__titulo" id="nombre-awr">Continuidad Operativa Resiliente</h1>
+                <p class="acceso__resumen">Monitoreo, analítica y acceso seguro para la gestión de procesos críticos en entornos empresariales.</p>
+            </div>
         </section>
         <section class="acceso__lado">
             <form class="acceso__tarjeta" id="formulario-acceso" method="post" action="app/Controllers/AuthController.php" novalidate>
-                <h2 class="acceso__encabezado">Iniciar sesión</h2>
-                <p class="acceso__ayuda">Usa el usuario y la contraseña de tu cuenta.</p>
+                <div class="acceso__cabecera">
+                    <div class="acceso__placa">
+                        <img src="public/img/branding/awr-logo.png" alt="AWR">
+                    </div>
+                    <h2 class="acceso__encabezado">Iniciar sesión</h2>
+                    <p class="acceso__ayuda">Accede con tu usuario para continuar.</p>
+                </div>
                 <p class="acceso__mensaje" id="mensaje-acceso" role="alert" hidden></p>
                 <div class="campo">
                     <label for="username">Usuario</label>
