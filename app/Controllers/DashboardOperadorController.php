@@ -294,8 +294,6 @@ function obtenerResumenOperador(): void
             'facturasRecientes' => $facturasRecientes,
             'stock' => $itemsStock,
             'sincronizacion' => 'Pendiente',
-            'turno' => 'Pendiente',
-            'caja' => 'Pendiente',
             'modoResiliente' => 'Pendiente de integración',
             'operacionesPendientes' => 'Pendiente',
         ]);

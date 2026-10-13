@@ -132,8 +132,6 @@
         var facturas = document.getElementById('facturas-recientes');
         var stock = document.getElementById('lista-stock');
 
-        texto('sucursal-nombre', sucursal.nombre || 'No disponible');
-        texto('sucursal-ciudad', sucursal.ciudad || '');
         texto('jornada-meta', 'Sucursal: ' + (sucursal.nombre || 'No disponible') + ' · Punto de emisión: ' + (datos.puntoEmision || 'Pendiente'));
         texto('ventas-hoy', datos.ventasHoy || 'No disponible');
         texto('facturas-hoy', datos.facturas && datos.facturas.total ? datos.facturas.total : '0');
@@ -150,9 +148,7 @@
         texto('tickets-emitidos', datos.tickets || '0 facturas');
         texto('tickets-nota', '');
         texto('total-cobrado', 'Total cobrado hoy: ' + (datos.totalCobrado || '$ 0,00'));
-        texto('senal-caja', datos.caja || 'Pendiente');
         texto('senal-sincronizacion', datos.sincronizacion || 'Pendiente');
-        texto('senal-turno', datos.turno || 'Pendiente');
         texto('modo-resiliente', datos.modoResiliente || 'Pendiente de integración');
         texto('operaciones-pendientes', 'Operaciones pendientes: ' + (datos.operacionesPendientes || 'Pendiente'));
         dibujarHoras(Array.isArray(datos.serie) ? datos.serie : []);
@@ -220,10 +216,9 @@
     }
 
     function marcarNoDisponible() {
-        ['sucursal-nombre', 'ventas-hoy', 'facturas-hoy', 'unidades-hoy', 'efectivo-hoy', 'stock-critico'].forEach(function (id) {
+        ['ventas-hoy', 'facturas-hoy', 'unidades-hoy', 'efectivo-hoy', 'stock-critico'].forEach(function (id) {
             texto(id, 'No disponible');
         });
-        texto('sucursal-ciudad', '');
         texto('jornada-meta', 'Sucursal: No disponible · Punto de emisión: No disponible');
         texto('ticket-promedio', 'No disponible');
         texto('unidades-nota', 'No disponible');
@@ -292,5 +287,109 @@
                 }
             });
         });
+    });
+
+    var atajos = {
+        F1: document.querySelector('[data-atajo="F1"]'),
+        F2: document.querySelector('[data-atajo="F2"]'),
+        F3: document.querySelector('[data-atajo="F3"]')
+    };
+    var ayuda = document.getElementById('ayuda-turno');
+    var pulso = null;
+
+    function campoEditable(objetivo) {
+        if (!objetivo || typeof objetivo.closest !== 'function') {
+            return false;
+        }
+
+        var campo = objetivo.closest('input, textarea, select');
+
+        if (!campo || campo.disabled || campo.readOnly) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function marcarAtajo(tecla) {
+        var control = atajos[tecla];
+
+        if (!control) {
+            return;
+        }
+
+        control.classList.add('comandos__pulso');
+        control.focus();
+        window.clearTimeout(pulso);
+        pulso = window.setTimeout(function () {
+            control.classList.remove('comandos__pulso');
+        }, 180);
+    }
+
+    function abrirAyuda() {
+        if (!ayuda || ayuda.open) {
+            return;
+        }
+
+        ayuda.showModal();
+    }
+
+    function cerrarAyuda() {
+        if (ayuda && ayuda.open) {
+            ayuda.close();
+        }
+    }
+
+    function irAlAcceso(tecla) {
+        var control = atajos[tecla];
+        var ruta = control ? control.getAttribute('href') : '';
+
+        if (ruta) {
+            window.location.href = ruta;
+        }
+    }
+
+    if (atajos.F1) {
+        atajos.F1.addEventListener('click', abrirAyuda);
+    }
+
+    if (ayuda) {
+        ayuda.querySelector('[data-cerrar-ayuda]').addEventListener('click', cerrarAyuda);
+        ayuda.addEventListener('cancel', function (event) {
+            event.preventDefault();
+            cerrarAyuda();
+        });
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            if (ayuda && ayuda.open) {
+                event.preventDefault();
+                cerrarAyuda();
+            }
+            return;
+        }
+
+        if (event.key !== 'F1' && event.key !== 'F2' && event.key !== 'F3') {
+            return;
+        }
+
+        if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+            return;
+        }
+
+        if (campoEditable(event.target)) {
+            return;
+        }
+
+        event.preventDefault();
+        marcarAtajo(event.key);
+
+        if (event.key === 'F1') {
+            abrirAyuda();
+            return;
+        }
+
+        irAlAcceso(event.key);
     });
 }());

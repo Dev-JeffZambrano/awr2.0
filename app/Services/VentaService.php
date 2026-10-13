@@ -1,0 +1,785 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Database\QueryException;
+use RuntimeException;
+use Throwable;
+
+class VentaRechazada extends RuntimeException
+{
+}
+
+class VentaService
+{
+    private const TIPO_FACTURA = '01';
+    private const TIPO_OPERACION = 'FACTURA';
+    private const TIPO_MOVIMIENTO = 'SALIDA_FACTURA';
+    private const CONSUMIDOR_FINAL = 'CONSUMIDOR_FINAL';
+    private const LIMITE_BUSQUEDA = 15;
+    private const LIMITE_LINEAS = 40;
+
+    public static function obtenerDatosPos(int $idUsuario): array
+    {
+        $sucursal = self::sucursalAutorizada($idUsuario);
+        $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa);
+        $puntos = self::puntosActivos((int) $sucursal->id_sucursal);
+        $consumidor = self::consumidorFinal();
+        $metodos = DB::select(
+            'SELECT id_metodo_pago, codigo, nombre
+             FROM metodo_pago
+             WHERE estado IS TRUE
+             ORDER BY id_metodo_pago'
+        );
+        $tipo = self::tipoFactura();
+
+        return [
+            'exito' => true,
+            'sucursal' => [
+                'nombre' => (string) $sucursal->nombre,
+                'ciudad' => (string) $sucursal->ciudad,
+                'codigoEstablecimiento' => (string) $sucursal->codigo_establecimiento,
+            ],
+            'empresa' => [
+                'nombre' => (string) $empresa->nombre,
+                'razonSocial' => (string) $empresa->razon_social,
+                'identificacion' => (string) $empresa->identificacion,
+                'nombreComercial' => (string) ($empresa->nombre_comercial ?? ''),
+            ],
+            'puntosEmision' => array_map(static function ($punto): array {
+                return [
+                    'id' => (int) $punto->id_punto_emision,
+                    'codigo' => (string) $punto->codigo,
+                    'descripcion' => (string) $punto->descripcion,
+                ];
+            }, $puntos),
+            'puntoSeleccionado' => count($puntos) === 1 ? (int) $puntos[0]->id_punto_emision : null,
+            'consumidorFinal' => [
+                'id' => (int) $consumidor->id_cliente,
+                'tipoIdentificacion' => (string) $consumidor->tipo_identificacion,
+                'identificacion' => (string) $consumidor->identificacion,
+                'razonSocial' => (string) $consumidor->razon_social,
+            ],
+            'metodosPago' => array_map(static function ($metodo): array {
+                return [
+                    'id' => (int) $metodo->id_metodo_pago,
+                    'codigo' => (string) $metodo->codigo,
+                    'nombre' => (string) $metodo->nombre,
+                ];
+            }, $metodos),
+            'tipoComprobante' => [
+                'id' => (int) $tipo->id_tipo_comprobante,
+                'codigo' => (string) $tipo->codigo,
+                'nombre' => (string) $tipo->nombre,
+            ],
+        ];
+    }
+
+    public static function buscarProductos(int $idUsuario, string $texto): array
+    {
+        $sucursal = self::sucursalAutorizada($idUsuario);
+        $texto = trim($texto);
+
+        if ($texto === '' || mb_strlen($texto) > 80) {
+            return ['exito' => true, 'productos' => []];
+        }
+
+        $como = self::patron($texto);
+        $filas = DB::select(
+            'SELECT p.id_producto, p.codigo, p.nombre, p.precio,
+                    i.codigo AS codigo_impuesto, i.nombre AS nombre_impuesto, i.porcentaje,
+                    inv.stock_actual
+             FROM producto p
+             JOIN inventario_sucursal inv
+               ON inv.id_producto = p.id_producto
+              AND inv.id_sucursal = ?
+              AND inv.estado IS TRUE
+             JOIN impuesto i ON i.id_impuesto = p.id_impuesto AND i.estado IS TRUE
+             WHERE p.estado IS TRUE
+               AND (
+                    p.nombre ILIKE ? ESCAPE \'|\'
+                    OR p.codigo ILIKE ? ESCAPE \'|\'
+                    OR p.codigo_barras ILIKE ? ESCAPE \'|\'
+               )
+             ORDER BY p.nombre
+             LIMIT ' . self::LIMITE_BUSQUEDA,
+            [(int) $sucursal->id_sucursal, $como, $como, $como]
+        );
+
+        return [
+            'exito' => true,
+            'productos' => array_map(static function ($fila): array {
+                return [
+                    'idProducto' => (int) $fila->id_producto,
+                    'codigo' => (string) $fila->codigo,
+                    'nombre' => (string) $fila->nombre,
+                    'precio' => self::redondear((string) $fila->precio),
+                    'codigoImpuesto' => (string) $fila->codigo_impuesto,
+                    'nombreImpuesto' => (string) $fila->nombre_impuesto,
+                    'porcentajeImpuesto' => self::redondear((string) $fila->porcentaje),
+                    'stockActual' => (int) $fila->stock_actual,
+                ];
+            }, $filas),
+        ];
+    }
+
+    public static function buscarClientes(int $idUsuario, string $texto): array
+    {
+        self::sucursalAutorizada($idUsuario);
+        $texto = trim($texto);
+
+        if ($texto === '' || mb_strlen($texto) > 80) {
+            return ['exito' => true, 'clientes' => []];
+        }
+
+        $como = self::patron($texto);
+        $filas = DB::select(
+            'SELECT id_cliente, tipo_identificacion, identificacion, razon_social
+             FROM cliente
+             WHERE estado IS TRUE
+               AND (
+                    identificacion ILIKE ? ESCAPE \'|\'
+                    OR razon_social ILIKE ? ESCAPE \'|\'
+               )
+             ORDER BY razon_social
+             LIMIT ' . self::LIMITE_BUSQUEDA,
+            [$como, $como]
+        );
+
+        return [
+            'exito' => true,
+            'clientes' => array_map(static function ($fila): array {
+                return [
+                    'id' => (int) $fila->id_cliente,
+                    'tipoIdentificacion' => (string) $fila->tipo_identificacion,
+                    'identificacion' => (string) $fila->identificacion,
+                    'razonSocial' => (string) $fila->razon_social,
+                ];
+            }, $filas),
+        ];
+    }
+
+    public static function cotizarVenta(int $idUsuario, array $productos): array
+    {
+        $sucursal = self::sucursalAutorizada($idUsuario);
+        $cantidades = self::consolidarProductos($productos);
+        $lineas = self::armarLineas((int) $sucursal->id_sucursal, $cantidades, false);
+        $cotizacion = self::sumarLineas($lineas);
+        $cotizacion['exito'] = true;
+
+        return $cotizacion;
+    }
+
+    public static function confirmarVenta(int $idUsuario, array $entrada): array
+    {
+        $uuid = self::uuid($entrada['id_operacion'] ?? null);
+        $idCliente = self::entero($entrada['id_cliente'] ?? null, 'Cliente no disponible');
+        $idMetodo = self::entero($entrada['id_metodo_pago'] ?? null, 'Método de pago no disponible');
+        $idPunto = self::entero($entrada['id_punto_emision'] ?? null, 'Punto de emisión no disponible');
+        $cantidades = self::consolidarProductos($entrada['productos'] ?? null);
+
+        DB::beginTransaction();
+
+        try {
+            $sucursal = self::sucursalAutorizada($idUsuario);
+            $idSucursal = (int) $sucursal->id_sucursal;
+            $punto = self::puntoAutorizado($idPunto, $idSucursal);
+            $tipo = self::tipoFactura();
+            $cliente = self::clienteActivo($idCliente);
+            $metodo = self::metodoActivo($idMetodo);
+            $existente = self::facturaDeOperacion($uuid);
+
+            if ($existente !== null) {
+                self::exigirMismaOperacion($existente, $idUsuario, $idSucursal);
+                DB::commit();
+
+                return self::respuestaFactura($existente, true);
+            }
+
+            $secuencial = DB::selectOne(
+                'SELECT id_secuencial, ultimo_numero
+                 FROM secuencial_comprobante
+                 WHERE id_punto_emision = ?
+                   AND id_tipo_comprobante = ?
+                   AND estado IS TRUE
+                 FOR UPDATE',
+                [(int) $punto->id_punto_emision, (int) $tipo->id_tipo_comprobante]
+            );
+
+            if ($secuencial === null) {
+                throw new VentaRechazada('No disponible');
+            }
+
+            $numero = (int) $secuencial->ultimo_numero + 1;
+
+            if ($numero < 1 || $numero > 999999999) {
+                throw new VentaRechazada('No disponible');
+            }
+
+            $lineas = self::armarLineas($idSucursal, $cantidades, true);
+            self::exigirStock($lineas);
+            $totales = self::sumarLineas($lineas);
+            $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa);
+            $configuracion = self::configuracionEmpresa((int) $sucursal->id_empresa);
+            $comprobante = sprintf(
+                '%s-%s-%09d',
+                $sucursal->codigo_establecimiento,
+                $punto->codigo,
+                $numero
+            );
+
+            DB::table('operacion_idempotente')->insert([
+                'id_operacion' => $uuid,
+                'tipo_operacion' => self::TIPO_OPERACION,
+                'id_usuario' => $idUsuario,
+                'id_sucursal' => $idSucursal,
+            ]);
+
+            $idFactura = DB::table('factura')->insertGetId([
+                'id_operacion' => $uuid,
+                'id_empresa' => (int) $empresa->id_empresa,
+                'id_sucursal' => $idSucursal,
+                'id_punto_emision' => (int) $punto->id_punto_emision,
+                'id_tipo_comprobante' => (int) $tipo->id_tipo_comprobante,
+                'id_cliente' => (int) $cliente->id_cliente,
+                'id_usuario' => $idUsuario,
+                'secuencial' => $numero,
+                'numero_comprobante' => $comprobante,
+                'fecha_emision' => DB::raw('NOW()'),
+                'estado' => 'EMITIDA',
+                'subtotal' => $totales['subtotal'],
+                'descuento' => $totales['descuento'],
+                'valor_impuesto' => $totales['valorImpuesto'],
+                'total' => $totales['total'],
+                'ruc_empresa' => (string) $empresa->identificacion,
+                'razon_social_empresa' => (string) ($empresa->razon_social !== null && $empresa->razon_social !== ''
+                    ? $empresa->razon_social
+                    : $empresa->nombre),
+                'nombre_comercial_empresa' => $empresa->nombre_comercial,
+                'direccion_matriz' => $empresa->direccion,
+                'codigo_establecimiento' => (string) $sucursal->codigo_establecimiento,
+                'nombre_sucursal' => (string) $sucursal->nombre,
+                'direccion_sucursal' => $sucursal->direccion,
+                'codigo_punto_emision' => (string) $punto->codigo,
+                'codigo_tipo_comprobante' => (string) $tipo->codigo,
+                'moneda' => (string) $configuracion->moneda,
+                'ambiente' => (string) $configuracion->ambiente,
+                'tipo_emision' => (string) $configuracion->tipo_emision,
+                'tipo_identificacion_cliente' => (string) $cliente->tipo_identificacion,
+                'identificacion_cliente' => (string) $cliente->identificacion,
+                'razon_social_cliente' => (string) $cliente->razon_social,
+                'direccion_cliente' => $cliente->direccion,
+            ], 'id_factura');
+
+            foreach ($lineas as $linea) {
+                DB::table('factura_detalle')->insert([
+                    'id_factura' => $idFactura,
+                    'id_producto' => $linea['idProducto'],
+                    'codigo_producto' => $linea['codigo'],
+                    'nombre_producto' => $linea['nombre'],
+                    'nombre_categoria' => $linea['nombreCategoria'],
+                    'cantidad' => $linea['cantidad'],
+                    'precio_unitario' => $linea['precioUnitario'],
+                    'costo_unitario' => $linea['costoUnitario'],
+                    'descuento' => '0.00',
+                    'id_impuesto' => $linea['idImpuesto'],
+                    'codigo_impuesto' => $linea['codigoImpuesto'],
+                    'nombre_impuesto' => $linea['nombreImpuesto'],
+                    'porcentaje_impuesto' => $linea['porcentajeImpuesto'],
+                    'subtotal' => $linea['subtotal'],
+                    'valor_impuesto' => $linea['valorImpuesto'],
+                    'total_linea' => $linea['totalLinea'],
+                ]);
+            }
+
+            DB::table('pago')->insert([
+                'id_factura' => $idFactura,
+                'id_metodo_pago' => (int) $metodo->id_metodo_pago,
+                'monto' => $totales['total'],
+                'referencia' => null,
+            ]);
+
+            foreach ($lineas as $linea) {
+                $stockNuevo = $linea['stockActual'] - $linea['cantidad'];
+                $actualizadas = DB::update(
+                    'UPDATE inventario_sucursal
+                     SET stock_actual = ?, fecha_actualizacion = NOW()
+                     WHERE id_inventario = ? AND stock_actual = ?',
+                    [$stockNuevo, $linea['idInventario'], $linea['stockActual']]
+                );
+
+                if ($actualizadas !== 1) {
+                    throw new VentaRechazada('Stock insuficiente.');
+                }
+
+                DB::table('movimiento_inventario')->insert([
+                    'id_operacion' => $uuid,
+                    'id_sucursal' => $idSucursal,
+                    'id_producto' => $linea['idProducto'],
+                    'id_usuario' => $idUsuario,
+                    'id_factura' => $idFactura,
+                    'tipo_movimiento' => self::TIPO_MOVIMIENTO,
+                    'cantidad' => $linea['cantidad'],
+                    'stock_anterior' => $linea['stockActual'],
+                    'stock_nuevo' => $stockNuevo,
+                ]);
+            }
+
+            $avanzado = DB::update(
+                'UPDATE secuencial_comprobante
+                 SET ultimo_numero = ?, updated_at = NOW()
+                 WHERE id_secuencial = ? AND ultimo_numero = ?',
+                [$numero, (int) $secuencial->id_secuencial, (int) $secuencial->ultimo_numero]
+            );
+
+            if ($avanzado !== 1) {
+                throw new VentaRechazada('No disponible');
+            }
+
+            DB::commit();
+
+            $creada = self::facturaDeOperacion($uuid);
+
+            if ($creada === null) {
+                throw new VentaRechazada('No disponible');
+            }
+
+            return self::respuestaFactura($creada, false);
+        } catch (VentaRechazada $e) {
+            self::revertir();
+            throw $e;
+        } catch (QueryException $e) {
+            self::revertir();
+
+            if (self::esDuplicadoOperacion($e)) {
+                $existente = self::facturaDeOperacion($uuid);
+
+                if ($existente !== null) {
+                    $sucursal = self::sucursalAutorizada($idUsuario);
+                    self::exigirMismaOperacion($existente, $idUsuario, (int) $sucursal->id_sucursal);
+
+                    return self::respuestaFactura($existente, true);
+                }
+            }
+
+            error_log('AWR confirmarVenta: ' . $e->getMessage());
+            throw new VentaRechazada('No disponible');
+        } catch (Throwable $e) {
+            self::revertir();
+            error_log('AWR confirmarVenta: ' . $e->getMessage());
+            throw new VentaRechazada('No disponible');
+        }
+    }
+
+    private static function sucursalAutorizada(int $idUsuario): object
+    {
+        $filas = DB::select(
+            'SELECT s.id_sucursal, s.id_empresa, s.nombre, s.ciudad, s.direccion, s.codigo_establecimiento
+             FROM usuario_sucursal us
+             JOIN sucursal s ON s.id_sucursal = us.id_sucursal AND s.estado IS TRUE
+             WHERE us.id_usuario = ? AND us.estado IS TRUE',
+            [$idUsuario]
+        );
+
+        if (count($filas) !== 1) {
+            throw new VentaRechazada('No disponible');
+        }
+
+        return $filas[0];
+    }
+
+    private static function empresaDeSucursal(int $idEmpresa): object
+    {
+        $empresa = DB::selectOne(
+            'SELECT id_empresa, nombre, razon_social, identificacion, nombre_comercial, direccion
+             FROM empresa
+             WHERE id_empresa = ? AND estado IS TRUE',
+            [$idEmpresa]
+        );
+
+        if ($empresa === null || $empresa->identificacion === null || $empresa->identificacion === '') {
+            throw new VentaRechazada('No disponible');
+        }
+
+        return $empresa;
+    }
+
+    private static function configuracionEmpresa(int $idEmpresa): object
+    {
+        $configuracion = DB::selectOne(
+            'SELECT moneda, ambiente, tipo_emision
+             FROM configuracion_facturacion
+             WHERE id_empresa = ? AND estado IS TRUE',
+            [$idEmpresa]
+        );
+
+        if ($configuracion === null) {
+            throw new VentaRechazada('No disponible');
+        }
+
+        return $configuracion;
+    }
+
+    private static function puntosActivos(int $idSucursal): array
+    {
+        return DB::select(
+            'SELECT id_punto_emision, codigo, descripcion
+             FROM punto_emision
+             WHERE id_sucursal = ? AND estado IS TRUE
+             ORDER BY codigo, id_punto_emision',
+            [$idSucursal]
+        );
+    }
+
+    private static function puntoAutorizado(int $idPunto, int $idSucursal): object
+    {
+        $punto = DB::selectOne(
+            'SELECT id_punto_emision, codigo, descripcion
+             FROM punto_emision
+             WHERE id_punto_emision = ? AND id_sucursal = ? AND estado IS TRUE',
+            [$idPunto, $idSucursal]
+        );
+
+        if ($punto === null) {
+            throw new VentaRechazada('Punto de emisión no disponible');
+        }
+
+        return $punto;
+    }
+
+    private static function tipoFactura(): object
+    {
+        $tipo = DB::selectOne(
+            'SELECT id_tipo_comprobante, codigo, nombre
+             FROM tipo_comprobante
+             WHERE codigo = ? AND estado IS TRUE',
+            [self::TIPO_FACTURA]
+        );
+
+        if ($tipo === null) {
+            throw new VentaRechazada('No disponible');
+        }
+
+        return $tipo;
+    }
+
+    private static function consumidorFinal(): object
+    {
+        $filas = DB::select(
+            'SELECT id_cliente, tipo_identificacion, identificacion, razon_social
+             FROM cliente
+             WHERE tipo_identificacion = ? AND estado IS TRUE
+             ORDER BY id_cliente',
+            [self::CONSUMIDOR_FINAL]
+        );
+
+        if (count($filas) !== 1) {
+            throw new VentaRechazada('No disponible');
+        }
+
+        return $filas[0];
+    }
+
+    private static function clienteActivo(int $idCliente): object
+    {
+        $cliente = DB::selectOne(
+            'SELECT id_cliente, tipo_identificacion, identificacion, razon_social, direccion
+             FROM cliente
+             WHERE id_cliente = ? AND estado IS TRUE',
+            [$idCliente]
+        );
+
+        if ($cliente === null) {
+            throw new VentaRechazada('Cliente no disponible');
+        }
+
+        return $cliente;
+    }
+
+    private static function metodoActivo(int $idMetodo): object
+    {
+        $metodo = DB::selectOne(
+            'SELECT id_metodo_pago, codigo, nombre
+             FROM metodo_pago
+             WHERE id_metodo_pago = ? AND estado IS TRUE',
+            [$idMetodo]
+        );
+
+        if ($metodo === null) {
+            throw new VentaRechazada('Método de pago no disponible');
+        }
+
+        return $metodo;
+    }
+
+    private static function consolidarProductos(mixed $productos): array
+    {
+        if (!is_array($productos) || $productos === []) {
+            throw new VentaRechazada('Datos incompletos.');
+        }
+
+        $cantidades = [];
+
+        foreach ($productos as $producto) {
+            if (!is_array($producto)) {
+                throw new VentaRechazada('Datos incompletos.');
+            }
+
+            $id = self::entero($producto['id_producto'] ?? null, 'Producto no disponible');
+            $cantidad = self::entero($producto['cantidad'] ?? null, 'Datos incompletos.');
+
+            if ($cantidad < 1 || $cantidad > 9999) {
+                throw new VentaRechazada('Datos incompletos.');
+            }
+
+            $cantidades[$id] = ($cantidades[$id] ?? 0) + $cantidad;
+
+            if ($cantidades[$id] > 9999) {
+                throw new VentaRechazada('Datos incompletos.');
+            }
+        }
+
+        if (count($cantidades) > self::LIMITE_LINEAS) {
+            throw new VentaRechazada('Datos incompletos.');
+        }
+
+        ksort($cantidades);
+
+        return $cantidades;
+    }
+
+    private static function armarLineas(int $idSucursal, array $cantidades, bool $bloquear): array
+    {
+        $ids = array_keys($cantidades);
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $sql = 'SELECT inv.id_inventario, inv.id_producto, inv.stock_actual,
+                       p.codigo, p.nombre, p.precio, p.costo, p.estado AS producto_activo,
+                       c.nombre AS nombre_categoria,
+                       i.id_impuesto, i.codigo AS codigo_impuesto, i.nombre AS nombre_impuesto,
+                       i.porcentaje, i.estado AS impuesto_activo
+                FROM inventario_sucursal inv
+                JOIN producto p ON p.id_producto = inv.id_producto
+                JOIN categoria c ON c.id_categoria = p.id_categoria
+                JOIN impuesto i ON i.id_impuesto = p.id_impuesto
+                WHERE inv.id_sucursal = ?
+                  AND inv.estado IS TRUE
+                  AND inv.id_producto IN (' . $marcas . ')
+                ORDER BY inv.id_producto';
+
+        if ($bloquear) {
+            $sql .= ' FOR UPDATE OF inv';
+        }
+
+        $filas = DB::select($sql, array_merge([$idSucursal], $ids));
+        $porId = [];
+
+        foreach ($filas as $fila) {
+            $porId[(int) $fila->id_producto] = $fila;
+        }
+
+        $lineas = [];
+
+        foreach ($cantidades as $idProducto => $cantidad) {
+            $fila = $porId[$idProducto] ?? null;
+
+            if (
+                $fila === null
+                || !self::esVerdadero($fila->producto_activo)
+                || !self::esVerdadero($fila->impuesto_activo)
+            ) {
+                throw new VentaRechazada('Producto no disponible');
+            }
+
+            $precio = self::redondear((string) $fila->precio);
+            $costo = self::redondear((string) $fila->costo);
+            $porcentaje = self::redondear((string) $fila->porcentaje);
+            $subtotal = self::redondear((float) $precio * $cantidad);
+            $impuesto = self::redondear((float) $subtotal * (float) $porcentaje / 100);
+            $total = self::redondear((float) $subtotal + (float) $impuesto);
+            $stock = (int) $fila->stock_actual;
+
+            $lineas[] = [
+                'idInventario' => (int) $fila->id_inventario,
+                'idProducto' => (int) $fila->id_producto,
+                'codigo' => (string) $fila->codigo,
+                'nombre' => (string) $fila->nombre,
+                'nombreCategoria' => (string) $fila->nombre_categoria,
+                'cantidad' => $cantidad,
+                'precioUnitario' => $precio,
+                'costoUnitario' => $costo,
+                'idImpuesto' => (int) $fila->id_impuesto,
+                'codigoImpuesto' => (string) $fila->codigo_impuesto,
+                'nombreImpuesto' => (string) $fila->nombre_impuesto,
+                'porcentajeImpuesto' => $porcentaje,
+                'subtotal' => $subtotal,
+                'valorImpuesto' => $impuesto,
+                'totalLinea' => $total,
+                'stockActual' => $stock,
+                'stockSuficiente' => $stock >= $cantidad,
+            ];
+        }
+
+        return $lineas;
+    }
+
+    private static function exigirStock(array $lineas): void
+    {
+        foreach ($lineas as $linea) {
+            if ($linea['stockSuficiente'] !== true) {
+                throw new VentaRechazada('Stock insuficiente.');
+            }
+        }
+    }
+
+    private static function sumarLineas(array $lineas): array
+    {
+        $subtotal = 0.0;
+        $impuesto = 0.0;
+        $total = 0.0;
+        $stockSuficiente = true;
+        $visibles = [];
+
+        foreach ($lineas as $linea) {
+            $subtotal += (float) $linea['subtotal'];
+            $impuesto += (float) $linea['valorImpuesto'];
+            $total += (float) $linea['totalLinea'];
+            $stockSuficiente = $stockSuficiente && $linea['stockSuficiente'];
+            $visibles[] = [
+                'idProducto' => $linea['idProducto'],
+                'codigo' => $linea['codigo'],
+                'nombre' => $linea['nombre'],
+                'cantidad' => $linea['cantidad'],
+                'precioUnitario' => $linea['precioUnitario'],
+                'nombreImpuesto' => $linea['nombreImpuesto'],
+                'porcentajeImpuesto' => $linea['porcentajeImpuesto'],
+                'subtotal' => $linea['subtotal'],
+                'valorImpuesto' => $linea['valorImpuesto'],
+                'totalLinea' => $linea['totalLinea'],
+                'stockActual' => $linea['stockActual'],
+                'stockSuficiente' => $linea['stockSuficiente'],
+            ];
+        }
+
+        return [
+            'lineas' => $visibles,
+            'subtotal' => self::redondear($subtotal),
+            'descuento' => '0.00',
+            'valorImpuesto' => self::redondear($impuesto),
+            'total' => self::redondear($total),
+            'stockSuficiente' => $stockSuficiente,
+        ];
+    }
+
+    private static function facturaDeOperacion(string $uuid): ?object
+    {
+        return DB::selectOne(
+            'SELECT o.id_operacion, o.id_usuario, o.id_sucursal,
+                    f.id_factura, f.numero_comprobante, f.secuencial, f.estado,
+                    f.subtotal, f.descuento, f.valor_impuesto, f.total,
+                    f.razon_social_cliente, f.codigo_punto_emision,
+                    mp.nombre AS metodo_pago
+             FROM operacion_idempotente o
+             LEFT JOIN factura f ON f.id_operacion = o.id_operacion
+             LEFT JOIN pago p ON p.id_factura = f.id_factura
+             LEFT JOIN metodo_pago mp ON mp.id_metodo_pago = p.id_metodo_pago
+             WHERE o.id_operacion = ?',
+            [$uuid]
+        );
+    }
+
+    private static function exigirMismaOperacion(object $operacion, int $idUsuario, int $idSucursal): void
+    {
+        if ((int) $operacion->id_usuario !== $idUsuario || (int) $operacion->id_sucursal !== $idSucursal) {
+            throw new VentaRechazada('No disponible');
+        }
+
+        if ($operacion->id_factura === null) {
+            throw new VentaRechazada('No disponible');
+        }
+    }
+
+    private static function respuestaFactura(object $factura, bool $idempotente): array
+    {
+        return [
+            'exito' => true,
+            'idempotente' => $idempotente,
+            'factura' => [
+                'idFactura' => (int) $factura->id_factura,
+                'numeroComprobante' => (string) $factura->numero_comprobante,
+                'secuencial' => (int) $factura->secuencial,
+                'estado' => (string) $factura->estado,
+                'subtotal' => self::redondear((string) $factura->subtotal),
+                'descuento' => self::redondear((string) $factura->descuento),
+                'valorImpuesto' => self::redondear((string) $factura->valor_impuesto),
+                'total' => self::redondear((string) $factura->total),
+                'cliente' => (string) $factura->razon_social_cliente,
+                'metodoPago' => (string) ($factura->metodo_pago ?? ''),
+                'codigoPuntoEmision' => (string) $factura->codigo_punto_emision,
+            ],
+        ];
+    }
+
+    private static function uuid(mixed $valor): string
+    {
+        if (!is_string($valor)) {
+            throw new VentaRechazada('Identificador de operación no válido');
+        }
+
+        $uuid = strtolower(trim($valor));
+
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $uuid) !== 1) {
+            throw new VentaRechazada('Identificador de operación no válido');
+        }
+
+        return $uuid;
+    }
+
+    private static function entero(mixed $valor, string $mensaje): int
+    {
+        if (is_int($valor)) {
+            return $valor > 0 ? $valor : throw new VentaRechazada($mensaje);
+        }
+
+        if (is_string($valor) && preg_match('/^[1-9][0-9]*$/', $valor) === 1) {
+            return (int) $valor;
+        }
+
+        throw new VentaRechazada($mensaje);
+    }
+
+    private static function patron(string $texto): string
+    {
+        return '%' . str_replace(['|', '%', '_'], ['||', '|%', '|_'], $texto) . '%';
+    }
+
+    private static function esVerdadero(mixed $valor): bool
+    {
+        return $valor === true || $valor === 1 || $valor === '1' || $valor === 't' || $valor === 'true';
+    }
+
+    private static function redondear(float|string $valor): string
+    {
+        return number_format(round((float) $valor, 2, PHP_ROUND_HALF_UP), 2, '.', '');
+    }
+
+    private static function esDuplicadoOperacion(QueryException $e): bool
+    {
+        $estado = (string) ($e->errorInfo[0] ?? '');
+
+        if ($estado !== '23505') {
+            return false;
+        }
+
+        $detalle = $e->getMessage();
+
+        return str_contains($detalle, 'id_operacion') || str_contains($detalle, 'operacion_idempotente');
+    }
+
+    private static function revertir(): void
+    {
+        if (DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
+    }
+}

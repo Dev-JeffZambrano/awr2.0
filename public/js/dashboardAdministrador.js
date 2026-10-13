@@ -19,8 +19,18 @@
         'usuarios-fallidos',
         'acceso-usuarios',
         'acceso-roles',
-        'acceso-auditoria'
+        'acceso-auditoria',
+        'latencia-valor',
+        'tiempo-postgres'
     ];
+
+    function milisegundos(valor) {
+        if (typeof valor === 'number' && isFinite(valor) && valor >= 0) {
+            return Math.round(valor) + ' ms';
+        }
+
+        return 'No disponible';
+    }
 
     function escribir(id, valor) {
         var nodo = document.getElementById(id);
@@ -72,6 +82,9 @@
             escribir('pg-nota', motor.nota);
             escribir('servicio-postgres', motor.servicio);
             escribir('servicio-postgres-estado', motor.conectado === true ? 'Conectado' : 'No disponible');
+
+            escribir('latencia-valor', milisegundos(datos.latenciaRedMs));
+            escribir('tiempo-postgres', milisegundos(datos.tiempoPostgresMs));
         }).catch(function () {
             marcarNoDisponible();
         });

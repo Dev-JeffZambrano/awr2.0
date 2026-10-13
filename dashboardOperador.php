@@ -44,6 +44,16 @@ $inicialBruta = function_exists('mb_substr')
     ? mb_substr($inicialFuente, 0, 1, 'UTF-8')
     : substr($inicialFuente, 0, 1);
 $inicial = htmlspecialchars($inicialBruta, ENT_QUOTES, 'UTF-8');
+$sucursalSesion = trim((string) ($_SESSION['sucursal'] ?? ''));
+$ciudadSesion = trim((string) ($_SESSION['ciudad'] ?? ''));
+$sucursalVisible = htmlspecialchars(
+    $sucursalSesion === '' ? 'Sucursal no disponible' : $sucursalSesion,
+    ENT_QUOTES,
+    'UTF-8'
+);
+$ciudadVisible = $ciudadSesion === ''
+    ? ''
+    : htmlspecialchars($ciudadSesion, ENT_QUOTES, 'UTF-8');
 
 $icono = static function (string $contenido): string {
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' . $contenido . '</svg>';
@@ -57,7 +67,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Operador | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardOperador.css">
+    <link rel="stylesheet" href="public/css/dashboardOperador.css?v=4">
 </head>
 <body>
     <div class="turno">
@@ -71,8 +81,10 @@ $icono = static function (string $contenido): string {
             </div>
             <div class="barra__sucursal">
                 <p>Sucursal asignada</p>
-                <strong id="sucursal-nombre">…</strong>
-                <span id="sucursal-ciudad">…</span>
+                <strong><?= $sucursalVisible ?></strong>
+                <?php if ($ciudadVisible !== ''): ?>
+                    <span><?= $ciudadVisible ?></span>
+                <?php endif; ?>
             </div>
             <details class="barra__menu" open>
                 <summary>Secciones</summary>
@@ -82,36 +94,32 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>') ?>
                         <span>Dashboard Turno</span>
                     </button>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="puntoVenta.php">
                         <?= $icono('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h4M7 14h10"/>') ?>
                         <span>Punto de Venta POS</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                    </a>
+                    <a class="barra__item" href="facturasEmitidas.php">
                         <?= $icono('<path d="M7 3h7l5 5v13H7V3Z"/><path d="M14 3v5h5"/>') ?>
                         <span>Facturas Emitidas</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                    </a>
+                    <a class="barra__item" href="catalogoPrecios.php">
                         <?= $icono('<path d="M4 7h16M4 12h16M4 17h10"/>') ?>
                         <span>Catálogo &amp; Precios</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>') ?>
-                        <span>Arqueo y Cierres</span>
-                    </button>
+                    </a>
 
                     <p class="barra__grupo">Agencia &amp; stock</p>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="stockAgencia.php">
                         <?= $icono('<path d="M4 7h16v12H4z"/><path d="M4 11h16M9 7V5h6v2"/>') ?>
                         <span>Stock en Agencia</span>
-                    </button>
+                    </a>
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
                         <span>Pedidos a Bodega Central</span>
                     </button>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="ficheroClientes.php">
                         <?= $icono('<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M5 20a7 7 0 0 1 14 0"/>') ?>
                         <span>Fichero de Clientes</span>
-                    </button>
+                    </a>
 
                     <p class="barra__grupo">Arquitectura AWR</p>
                     <button class="barra__item" type="button" disabled>
@@ -132,9 +140,7 @@ $icono = static function (string $contenido): string {
                     <input type="search" placeholder="Buscar por código, SKU o cliente" readonly>
                 </label>
                 <ul class="tope__senales" aria-label="Indicadores pendientes">
-                    <li><span>Caja</span><strong id="senal-caja">Pendiente</strong></li>
                     <li><span>Sincronización</span><strong id="senal-sincronizacion">Pendiente</strong></li>
-                    <li><span>Turno</span><strong id="senal-turno">Pendiente</strong></li>
                 </ul>
                 <div class="tope__cuenta">
                     <div class="tope__identidad">
@@ -152,10 +158,9 @@ $icono = static function (string $contenido): string {
             <section class="comandos" aria-label="Accesos rápidos del turno">
                 <p>Accesos rápidos</p>
                 <div>
-                    <button type="button" disabled><kbd>F2</kbd> Nueva factura</button>
-                    <button type="button" disabled><kbd>F3</kbd> Buscar producto</button>
-                    <button type="button" disabled><kbd>F4</kbd> Arqueo / Cierre</button>
-                    <button type="button" disabled><kbd>F1</kbd> Ayuda</button>
+                    <a href="puntoVenta.php" data-atajo="F2"><kbd>F2</kbd> Nueva factura</a>
+                    <a href="catalogoPrecios.php" data-atajo="F3"><kbd>F3</kbd> Buscar producto</a>
+                    <button type="button" data-atajo="F1"><kbd>F1</kbd> Ayuda</button>
                 </div>
             </section>
 
@@ -169,9 +174,8 @@ $icono = static function (string $contenido): string {
                         <p class="jornada__meta" id="jornada-meta">Sucursal: … · Punto de emisión: …</p>
                     </div>
                     <div class="jornada__acciones">
-                        <button type="button" disabled>Arqueo / Cierre<span>Próximamente</span></button>
                         <button type="button" disabled>Consultar precios<span>Próximamente</span></button>
-                        <button class="jornada__emitir" type="button" disabled>Emitir factura<span>Próximamente</span></button>
+                        <a href="puntoVenta.php">Emitir factura<span>Punto de venta</span></a>
                     </div>
                 </section>
 
@@ -279,7 +283,18 @@ $icono = static function (string $contenido): string {
             </main>
         </div>
     </div>
+    <dialog class="ayuda" id="ayuda-turno" aria-labelledby="ayuda-titulo">
+        <div class="ayuda__hoja">
+            <h2 id="ayuda-titulo">Atajos disponibles</h2>
+            <ul>
+                <li><kbd>F2</kbd> Nueva factura</li>
+                <li><kbd>F3</kbd> Buscar producto</li>
+                <li><kbd>F1</kbd> Ayuda</li>
+            </ul>
+            <button class="ayuda__cerrar" type="button" data-cerrar-ayuda>Cerrar</button>
+        </div>
+    </dialog>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/dashboardOperador.js"></script>
+    <script src="public/js/dashboardOperador.js?v=2"></script>
 </body>
 </html>

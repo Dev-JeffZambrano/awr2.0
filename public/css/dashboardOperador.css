@@ -150,6 +150,7 @@ input {
     font-weight: 500;
     line-height: 1.25;
     text-align: left;
+    text-decoration: none;
     background: transparent;
     border: 0;
     border-radius: 0.55rem;
@@ -373,6 +374,7 @@ input {
 
 .jornada {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
     justify-content: space-between;
     gap: 1rem;
@@ -421,15 +423,26 @@ input {
     font-size: 0.82rem;
 }
 
+.jornada > div:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .jornada__acciones {
     display: flex;
-    flex-wrap: wrap;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
     justify-content: flex-end;
     gap: 0.45rem;
 }
 
-.jornada__acciones button {
+.jornada__acciones button,
+.jornada__acciones a,
+.jornada__acciones a:visited,
+.jornada__acciones a:hover,
+.jornada__acciones a:active {
     display: flex;
+    flex: 0 0 auto;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.05rem;
@@ -438,20 +451,18 @@ input {
     color: #f4f8fc;
     font-weight: 600;
     text-align: left;
+    text-decoration: none;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 0.75rem;
 }
 
 .jornada__acciones span {
+    display: block;
     color: rgba(244, 248, 252, 0.7);
     font-size: 0.68rem;
     font-weight: 500;
-}
-
-.jornada__emitir {
-    background: var(--color-primario) !important;
-    border-color: transparent !important;
+    white-space: nowrap;
 }
 
 .kpis,
@@ -646,7 +657,8 @@ input {
     gap: 0.4rem;
 }
 
-.comandos button {
+.comandos button,
+.comandos a {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -655,9 +667,20 @@ input {
     color: #f4f8fc;
     font-size: 0.8rem;
     font-weight: 600;
+    text-decoration: none;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 0.6rem;
+    cursor: pointer;
+}
+
+.comandos a:hover,
+.comandos button:hover,
+.comandos a:focus-visible,
+.comandos button:focus-visible,
+.comandos__pulso {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.32);
 }
 
 .comandos kbd {
@@ -672,6 +695,73 @@ input {
     color: #ffffff;
     background: var(--color-primario);
     border-color: var(--color-primario);
+}
+
+.ayuda {
+    width: min(22rem, calc(100% - 1.5rem));
+    padding: 0;
+    border: 0;
+    border-radius: 1rem;
+    background: transparent;
+}
+
+.ayuda::backdrop {
+    background: rgba(8, 16, 32, 0.55);
+}
+
+.ayuda__hoja {
+    padding: 1.1rem 1.15rem 1rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: var(--sombra-tarjeta);
+}
+
+.ayuda h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+}
+
+.ayuda ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ayuda li {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--color-borde);
+    font-size: 0.92rem;
+}
+
+.ayuda kbd {
+    min-width: 2rem;
+    padding: 0.12rem 0.35rem;
+    color: var(--color-panel-texto);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+    background: var(--color-panel);
+    border-radius: 0.35rem;
+}
+
+.ayuda__cerrar {
+    margin-top: 0.85rem;
+    height: 2.25rem;
+    padding: 0 0.95rem;
+    color: #ffffff;
+    font-weight: 600;
+    background: var(--color-primario);
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.ayuda__cerrar:hover {
+    background: var(--color-primario-activo);
 }
 
 @media (min-width: 901px) {
@@ -755,6 +845,10 @@ input {
     .jornada__acciones,
     .comandos div {
         justify-content: flex-start;
+    }
+
+    .jornada__acciones {
+        flex-wrap: wrap;
     }
 }
 

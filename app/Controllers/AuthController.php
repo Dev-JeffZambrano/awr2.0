@@ -3,6 +3,7 @@
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
 use App\Models\Usuario;
+use Illuminate\Database\Capsule\Manager as DB;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -125,6 +126,27 @@ function iniciarSesion(array $entrada): void
             ]);
         }
 
+        $sucursal = null;
+
+        if ($nombreRol === 'Operador') {
+            $sucursales = DB::select(
+                'SELECT s.id_sucursal, s.nombre, s.ciudad
+                 FROM usuario_sucursal us
+                 JOIN sucursal s ON s.id_sucursal = us.id_sucursal AND s.estado IS TRUE
+                 WHERE us.id_usuario = ? AND us.estado IS TRUE',
+                [(int) $usuario->id_usuario]
+            );
+
+            if (count($sucursales) !== 1) {
+                responder(200, [
+                    'exito' => false,
+                    'mensaje' => 'No disponible',
+                ]);
+            }
+
+            $sucursal = $sucursales[0];
+        }
+
         session_start();
         session_regenerate_id(true);
 
@@ -136,6 +158,12 @@ function iniciarSesion(array $entrada): void
             'id_rol' => (int) $rol->id_rol,
             'rol' => $nombreRol,
         ];
+
+        if ($sucursal !== null) {
+            $_SESSION['id_sucursal'] = (int) $sucursal->id_sucursal;
+            $_SESSION['sucursal'] = (string) $sucursal->nombre;
+            $_SESSION['ciudad'] = (string) $sucursal->ciudad;
+        }
 
         responder(200, [
             'exito' => true,

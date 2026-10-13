@@ -127,6 +127,8 @@ function obtenerResumenAdministrador(): void
         $version = versionPostgres($motor->version ?? null);
         $tablas = (int) ($motor->tablas ?? 0);
         $puerto = (int) ($motor->puerto ?? 0);
+        $latenciaRedMs = obtenerLatenciaToxiproxy();
+        $tiempoPostgresMs = medirTiempoRespuestaPostgres();
 
         responder(200, [
             'exito' => true,
@@ -162,7 +164,8 @@ function obtenerResumenAdministrador(): void
             ],
             'clickhouse' => 'Pendiente de integración',
             'redpanda' => 'Pendiente de integración',
-            'latencia' => 'Pendiente de monitoreo',
+            'latenciaRedMs' => $latenciaRedMs,
+            'tiempoPostgresMs' => $tiempoPostgresMs,
             'disponibilidad' => 'Pendiente de monitoreo',
             'seguridad' => 'Pendiente',
             'rendimiento' => 'Pendiente de monitoreo',
@@ -173,6 +176,89 @@ function obtenerResumenAdministrador(): void
             'exito' => false,
             'mensaje' => 'No disponible',
         ]);
+    }
+}
+
+function obtenerLatenciaToxiproxy(): ?int
+{
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+
+    $curl = curl_init('http://localhost:8474/proxies/awr_postgres_proxy/toxics');
+
+    if ($curl === false) {
+        return null;
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_HTTPGET => true,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+            'User-Agent: toxiproxy-cli',
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_TIMEOUT => 2,
+    ]);
+
+    $crudo = curl_exec($curl);
+    $codigo = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    curl_close($curl);
+
+    if (!is_string($crudo) || $codigo !== 200) {
+        return null;
+    }
+
+    $lista = json_decode($crudo, true);
+
+    if (!is_array($lista)) {
+        return null;
+    }
+
+    foreach ($lista as $toxic) {
+        if (!is_array($toxic)) {
+            continue;
+        }
+
+        if (($toxic['name'] ?? null) !== 'awr_latency' || ($toxic['type'] ?? null) !== 'latency') {
+            continue;
+        }
+
+        $latencia = $toxic['attributes']['latency'] ?? null;
+
+        if (is_int($latencia) || (is_string($latencia) && preg_match('/^\d+$/', $latencia) === 1)) {
+            return (int) $latencia;
+        }
+
+        if (is_float($latencia) && floor($latencia) === $latencia) {
+            return (int) $latencia;
+        }
+
+        return null;
+    }
+
+    return 0;
+}
+
+function medirTiempoRespuestaPostgres(): ?int
+{
+    try {
+        $pdo = DB::connection()->getPdo();
+        $inicio = hrtime(true);
+        $resultado = $pdo->query('SELECT 1');
+
+        if ($resultado !== false) {
+            $resultado->fetchAll();
+        }
+
+        $milisegundos = (int) round((hrtime(true) - $inicio) / 1000000);
+
+        return $milisegundos >= 0 ? $milisegundos : null;
+    } catch (Throwable $e) {
+        error_log('AWR medirTiempoRespuestaPostgres: ' . $e->getMessage());
+
+        return null;
     }
 }
 

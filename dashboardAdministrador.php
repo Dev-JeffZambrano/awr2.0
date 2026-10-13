@@ -190,10 +190,10 @@ $icono = static function (string $contenido): string {
                         <article class="tarjeta">
                             <div class="tarjeta__cabeza">
                                 <h3>Latencia de Red</h3>
-                                <span class="insignia">Pendiente</span>
+                                <span class="insignia" id="latencia-insignia">Toxiproxy</span>
                             </div>
-                            <p class="valor-pendiente">Pendiente</p>
-                            <p class="nota-pendiente">Pendiente de monitoreo</p>
+                            <p class="valor-pendiente" id="latencia-valor">…</p>
+                            <p class="nota-pendiente" id="latencia-nota">Latencia configurada</p>
                             <div class="huella" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                         </article>
                         <article class="tarjeta">
@@ -279,7 +279,7 @@ $icono = static function (string $contenido): string {
                         <p class="panel__texto">Pendiente de monitoreo.</p>
                         <ul class="lista lista--pista">
                             <li><span>Tiempo API</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
-                            <li><span>PostgreSQL</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
+                            <li><span>PostgreSQL</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-postgres">…</strong></li>
                             <li><span>RTT</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
                             <li><span>Throughput</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
                             <li><span>ClickHouse</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
