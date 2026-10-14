@@ -57,7 +57,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Administrativo | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardAdministrativo.css">
+    <link rel="stylesheet" href="public/css/dashboardAdministrativo.css?v=2">
 </head>
 <body>
     <div class="comercial">
@@ -76,14 +76,14 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>') ?>
                         <span>Dashboard Ejecutivo</span>
                     </button>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="clientesCartera.php">
                         <?= $icono('<path d="M16 19v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v1"/><circle cx="10" cy="8" r="3"/><path d="M20 8v6M23 11h-6"/>') ?>
-                        <span>Clientes &amp; Cartera</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                        <span>Clientes &amp; Comportamiento Comercial</span>
+                    </a>
+                    <a class="barra__item" href="catalogoPreciosAdministrativo.php">
                         <?= $icono('<path d="M4 7h16M4 12h16M4 17h10"/>') ?>
                         <span>Catálogo &amp; Precios</span>
-                    </button>
+                    </a>
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
                         <span>Inventario Multibodega</span>
