@@ -57,7 +57,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Administrador | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardAdministrador.css">
+    <link rel="stylesheet" href="public/css/dashboardAdministrador.css?v=4">
 </head>
 <body>
     <div class="mando">
@@ -76,18 +76,18 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>') ?>
                         <span>Dashboard Principal</span>
                     </button>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="monitoreoAdministrador.php">
                         <?= $icono('<path d="M4 13h4l2-6 4 12 2-6h4"/>') ?>
                         <span>Monitoreo en Tiempo Real</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                    </a>
+                    <a class="barra__item" href="serviciosAdministrador.php">
                         <?= $icono('<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/>') ?>
                         <span>Servicios</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                    </a>
+                    <a class="barra__item" href="basesDatosAdministrador.php">
                         <?= $icono('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>') ?>
                         <span>Bases de Datos</span>
-                    </button>
+                    </a>
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
                         <span>Reportes</span>
@@ -108,31 +108,29 @@ $icono = static function (string $contenido): string {
                     </button>
 
                     <p class="barra__grupo">Administración</p>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="usuariosAccesosAdministrador.php">
                         <?= $icono('<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M5 20a7 7 0 0 1 14 0"/>') ?>
-                        <span>Usuarios</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<circle cx="8" cy="15" r="3"/><path d="M11 15h10v2h-2v2h-2v-2h-2"/><path d="M13 15v-2"/>') ?>
-                        <span>Roles y Permisos</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
+                        <span>Usuarios y Accesos</span>
+                    </a>
+                    <a class="barra__item" href="clientesAdministrador.php">
+                        <?= $icono('<path d="M8 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3Z"/><path d="M16 11a3 3 0 1 0-3-3"/><path d="M2 19a6 6 0 0 1 10.5-3.8"/><path d="M22 19a6 6 0 0 0-4-5.6"/>') ?>
+                        <span>Clientes</span>
+                    </a>
+                    <a class="barra__item" href="configuracionAdministrador.php">
                         <?= $icono('<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>') ?>
                         <span>Configuración</span>
-                    </button>
+                    </a>
+                    <a class="barra__item" href="portafolioAdministrador.php">
+                        <?= $icono('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>') ?>
+                        <span>Portafolio Digital</span>
+                    </a>
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M8 4h8v16H8z"/><path d="M8 8H6M8 12H6M8 16H6M12 8h2M12 12h2"/>') ?>
                         <span>Auditoría</span>
                     </button>
-
-                    <p class="barra__grupo">Sistema &amp; Soporte</p>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>') ?>
-                        <span>Estado del Sistema</span>
-                    </button>
                 </nav>
             </details>
-            <p class="barra__nota">Monitoreo no conectado</p>
+            <p class="barra__nota">Resumen operativo</p>
         </aside>
 
         <div class="zona">
@@ -142,9 +140,9 @@ $icono = static function (string $contenido): string {
                     <?= $icono('<circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5"/>') ?>
                     <input type="search" placeholder="Buscar" readonly>
                 </label>
-                <ul class="tope__senales" aria-label="Indicadores pendientes">
-                    <li><span>Disponibilidad</span><strong>Pendiente de monitoreo</strong></li>
-                    <li><span>Latencia</span><strong>Pendiente de monitoreo</strong></li>
+                <ul class="tope__senales" aria-label="Indicadores del sistema">
+                    <li><span>Disponibilidad</span><strong id="senal-disponibilidad">…</strong></li>
+                    <li><span>Latencia</span><strong id="senal-latencia">…</strong></li>
                     <li><span>Sincronización</span><strong>Pendiente</strong></li>
                 </ul>
                 <div class="tope__cuenta">
@@ -190,19 +188,19 @@ $icono = static function (string $contenido): string {
                         <article class="tarjeta">
                             <div class="tarjeta__cabeza">
                                 <h3>Latencia de Red</h3>
-                                <span class="insignia" id="latencia-insignia">Toxiproxy</span>
+                                <span class="insignia">AWR ↔ PostgreSQL</span>
                             </div>
                             <p class="valor-pendiente" id="latencia-valor">…</p>
-                            <p class="nota-pendiente" id="latencia-nota">Latencia configurada</p>
+                            <p class="nota-pendiente" id="latencia-nota">Latencia base del enlace sin degradación artificial.</p>
                             <div class="huella" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                         </article>
-                        <article class="tarjeta">
+                        <article class="tarjeta tarjeta--artificial">
                             <div class="tarjeta__cabeza">
-                                <h3>Disponibilidad</h3>
-                                <span class="insignia">Pendiente</span>
+                                <h3>Latencia Artificial</h3>
+                                <span class="insignia">Toxiproxy</span>
                             </div>
-                            <p class="valor-pendiente">Pendiente</p>
-                            <p class="nota-pendiente">Pendiente de monitoreo</p>
+                            <p class="valor-pendiente" id="latencia-artificial-valor">…</p>
+                            <p class="nota-pendiente" id="latencia-artificial-nota">Retardo configurado</p>
                             <div class="huella" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                         </article>
                         <article class="tarjeta">
@@ -262,9 +260,9 @@ $icono = static function (string $contenido): string {
                             <h2 id="titulo-servicios">Estado de Servicios &amp; Daemons</h2>
                             <span class="insignia">Pendiente</span>
                         </div>
-                        <p class="panel__texto">Pendiente de monitoreo. PostgreSQL se comprueba con la conexión activa.</p>
+                        <p class="panel__texto">PHP y PostgreSQL se comprueban con el estado actual.</p>
                         <ul class="lista">
-                            <li><span><i class="punto" aria-hidden="true"></i>Aplicación PHP</span><strong>Pendiente</strong></li>
+                            <li><span><i class="punto" aria-hidden="true"></i><span id="servicio-php">Aplicación PHP</span></span><strong id="servicio-php-estado">…</strong></li>
                             <li><span><i class="punto" aria-hidden="true"></i><span id="servicio-postgres">PostgreSQL</span></span><strong id="servicio-postgres-estado">…</strong></li>
                             <li><span><i class="punto" aria-hidden="true"></i>Redpanda</span><strong>Pendiente</strong></li>
                             <li><span><i class="punto" aria-hidden="true"></i>ClickHouse</span><strong>Pendiente</strong></li>
@@ -279,7 +277,7 @@ $icono = static function (string $contenido): string {
                         <p class="panel__texto">Pendiente de monitoreo.</p>
                         <ul class="lista lista--pista">
                             <li><span>Tiempo API</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
-                            <li><span>PostgreSQL</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-postgres">…</strong></li>
+                            <li><span>Respuesta PostgreSQL</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-postgres">…</strong></li>
                             <li><span>RTT</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
                             <li><span>Throughput</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
                             <li><span>ClickHouse</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
@@ -296,9 +294,8 @@ $icono = static function (string $contenido): string {
                         <ul class="lista">
                             <li><span>Usuarios registrados</span><strong id="usuarios-registrados">…</strong></li>
                             <li><span>Usuarios habilitados</span><strong id="usuarios-habilitados">…</strong></li>
-                            <li><span>Sesiones</span><strong id="usuarios-sesiones">…</strong></li>
+                            <li><span>Usuarios inhabilitados</span><strong id="usuarios-inhabilitados">…</strong></li>
                             <li><span>Roles</span><strong id="usuarios-roles">…</strong></li>
-                            <li><span>Último acceso</span><strong id="usuarios-ultimo-acceso">…</strong></li>
                             <li><span>Intentos fallidos</span><strong id="usuarios-fallidos">…</strong></li>
                         </ul>
                     </section>
@@ -317,14 +314,14 @@ $icono = static function (string $contenido): string {
                                 <span>Matriz de Roles y Permisos</span>
                                 <strong id="acceso-roles">…</strong>
                             </button>
-                            <button type="button" disabled>
+                            <a href="configuracionAdministrador.php">
                                 <span>Configuración</span>
-                                <strong>Pendiente</strong>
-                            </button>
-                            <button type="button" disabled>
-                                <span>Auditoría</span>
-                                <strong id="acceso-auditoria">…</strong>
-                            </button>
+                                <strong>Abrir</strong>
+                            </a>
+                            <a href="portafolioAdministrador.php">
+                                <span>Portafolio Digital</span>
+                                <strong>Abrir</strong>
+                            </a>
                         </div>
                     </section>
                 </div>
@@ -332,6 +329,7 @@ $icono = static function (string $contenido): string {
         </div>
     </div>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/dashboardAdministrador.js"></script>
+    <script src="public/js/senalesAdministrador.js?v=1"></script>
+    <script src="public/js/dashboardAdministrador.js?v=6"></script>
 </body>
 </html>

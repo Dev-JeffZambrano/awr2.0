@@ -328,7 +328,7 @@ class VentaService
 
             $avanzado = DB::update(
                 'UPDATE secuencial_comprobante
-                 SET ultimo_numero = ?, updated_at = NOW()
+                 SET ultimo_numero = ?, fecha_actualizacion = NOW()
                  WHERE id_secuencial = ? AND ultimo_numero = ?',
                 [$numero, (int) $secuencial->id_secuencial, (int) $secuencial->ultimo_numero]
             );

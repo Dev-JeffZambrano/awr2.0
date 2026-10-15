@@ -130,9 +130,26 @@ input {
     font-weight: 500;
     line-height: 1.25;
     text-align: left;
+    text-decoration: none;
     background: transparent;
     border: 0;
     border-radius: 0.55rem;
+}
+
+a.barra__item,
+a.barra__item:link,
+a.barra__item:visited,
+a.barra__item:hover,
+a.barra__item:focus,
+a.barra__item:active {
+    color: rgba(244, 248, 252, 0.86);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.barra__item:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .barra__item svg,
@@ -437,7 +454,8 @@ input {
 
 .tarjeta,
 .panel,
-.accesos button {
+.accesos button,
+.accesos a {
     min-width: 0;
     background: var(--color-superficie);
     border: 1px solid var(--color-borde);
@@ -448,6 +466,11 @@ input {
 .tarjeta,
 .panel {
     padding: 1rem 1.05rem;
+}
+
+.tarjeta--artificial {
+    background: #fffaf3;
+    border-color: #e7c98a;
 }
 
 .tarjeta__cabeza,
@@ -605,7 +628,8 @@ input {
     border-radius: 999px;
 }
 
-.accesos button {
+.accesos button,
+.accesos a {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -615,10 +639,20 @@ input {
     color: var(--color-texto);
     font-weight: 600;
     text-align: left;
+    text-decoration: none;
     cursor: default;
 }
 
-.accesos button strong {
+.accesos a {
+    cursor: pointer;
+}
+
+.accesos a:hover {
+    border-color: var(--color-primario);
+}
+
+.accesos button strong,
+.accesos a strong {
     flex: 0 0 auto;
     font-size: 0.78rem;
     font-weight: 600;

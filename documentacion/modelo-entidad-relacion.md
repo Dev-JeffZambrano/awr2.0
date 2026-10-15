@@ -176,9 +176,96 @@ erDiagram
 
 `inventario_sucursal` tiene una fila como máximo por cada par sucursal y producto. `id_factura` en el movimiento puede quedar vacío. `id_impuesto` en `producto` también puede quedar vacío.
 
-## Seguridad, roles y sesiones
+## Facturación resiliente
 
-![Seguridad, roles y sesiones](er-seguridad-sesiones.png)
+La imagen comienza cuando el usuario confirma una factura y separa claramente sus dos caminos:
+
+- **Sin latencia:** la factura se guarda inmediatamente en PostgreSQL.
+- **Con latencia:** la factura entra en Redpanda; cuando la latencia vuelve a ser aceptable, el consumidor la guarda en PostgreSQL.
+
+Los dos caminos llegan a las mismas tablas. `id_operacion` evita guardar dos veces la misma factura. Mientras el mensaje espera en Redpanda todavía no existe una fila en `factura`. El stock se descuenta cuando la factura finalmente se guarda en PostgreSQL.
+
+`FACTURA_CONFIRMADA` representa el evento inicial y Redpanda representa el sistema externo; no son tablas de PostgreSQL. Las demás entidades sí corresponden al modelo transaccional existente.
+
+![Modelo entidad-relación de facturación resiliente](er-facturacion-dos-caminos.png)
+
+```mermaid
+erDiagram
+    FACTURA_CONFIRMADA ||--o| operacion_idempotente : "SIN LATENCIA guarda directo"
+    FACTURA_CONFIRMADA ||--o| REDPANDA : "CON LATENCIA publica"
+    REDPANDA ||--o| operacion_idempotente : "AL RECUPERARSE guarda"
+    operacion_idempotente ||--o| factura : registra
+    factura ||--|{ factura_detalle : contiene
+    factura ||--|{ pago : cobra
+    operacion_idempotente ||--o{ movimiento_inventario : agrupa
+    factura ||--o{ movimiento_inventario : provoca
+    sucursal ||--o{ inventario_sucursal : almacena
+    producto ||--o{ inventario_sucursal : existe
+    movimiento_inventario }o--|| inventario_sucursal : actualiza
+
+    FACTURA_CONFIRMADA {
+        uuid id_operacion
+        varchar ruta_seleccionada
+    }
+    REDPANDA {
+        varchar topic
+        uuid id_operacion
+        json factura_pendiente
+    }
+    operacion_idempotente {
+        uuid id_operacion PK
+        varchar tipo_operacion
+        int id_usuario FK
+        int id_sucursal FK
+    }
+    factura {
+        int id_factura PK
+        uuid id_operacion UK
+        int id_sucursal FK
+        int id_cliente FK
+        int id_usuario FK
+        varchar numero_comprobante
+        varchar estado
+    }
+    factura_detalle {
+        int id_factura_detalle PK
+        int id_factura FK
+        int id_producto FK
+        int cantidad
+    }
+    pago {
+        int id_pago PK
+        int id_factura FK
+        int id_metodo_pago FK
+        numeric monto
+    }
+    movimiento_inventario {
+        int id_movimiento PK
+        uuid id_operacion FK
+        int id_factura FK
+        int id_producto FK
+        int id_sucursal FK
+        varchar tipo_movimiento
+        int cantidad
+    }
+    inventario_sucursal {
+        int id_inventario PK
+        int id_sucursal FK
+        int id_producto FK
+        int stock_actual
+        int stock_minimo
+    }
+    sucursal {
+        int id_sucursal PK
+    }
+    producto {
+        int id_producto PK
+    }
+```
+
+## Seguridad y roles
+
+![Seguridad y roles](er-seguridad.png)
 
 ```mermaid
 erDiagram
@@ -188,7 +275,6 @@ erDiagram
     permiso ||--o{ rol_permiso : concede
     usuario ||--o{ usuario_sucursal : trabaja
     sucursal ||--o{ usuario_sucursal : admite
-    usuario ||--o{ sesion_usuario : abre
 
     usuario {
         int id_usuario PK
@@ -227,12 +313,6 @@ erDiagram
     sucursal {
         int id_sucursal PK
         int id_empresa FK
-    }
-    sesion_usuario {
-        uuid id_sesion PK
-        int id_usuario FK
-        boolean estado
-        timestamptz fecha_expiracion
     }
     auditoria_login {
         int id_auditoria PK

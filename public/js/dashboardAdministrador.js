@@ -11,16 +11,17 @@
         'pg-detalle',
         'pg-nota',
         'servicio-postgres-estado',
+        'servicio-php-estado',
         'usuarios-registrados',
         'usuarios-habilitados',
-        'usuarios-sesiones',
+        'usuarios-inhabilitados',
         'usuarios-roles',
-        'usuarios-ultimo-acceso',
         'usuarios-fallidos',
         'acceso-usuarios',
         'acceso-roles',
-        'acceso-auditoria',
         'latencia-valor',
+        'latencia-artificial-valor',
+        'latencia-artificial-nota',
         'tiempo-postgres'
     ];
 
@@ -30,6 +31,45 @@
         }
 
         return 'No disponible';
+    }
+
+    function milisegundosDecimales(valor) {
+        if (valor === null || valor === undefined || valor === '') {
+            return 'No disponible';
+        }
+
+        if (typeof valor === 'string') {
+            if (!/^\d+(?:\.\d+)?$/.test(valor.trim())) {
+                return 'No disponible';
+            }
+
+            valor = Number(valor);
+        }
+
+        if (typeof valor !== 'number' || !isFinite(valor) || valor < 0) {
+            return 'No disponible';
+        }
+
+        var texto = valor.toFixed(2).replace('.', ',');
+        texto = texto.replace(/,00$/, '').replace(/(\,\d)0$/, '$1');
+
+        return texto + ' ms';
+    }
+
+    function milisegundosEnteros(valor) {
+        if (valor === null || valor === undefined || valor === '') {
+            return null;
+        }
+
+        if (typeof valor === 'number' && isFinite(valor) && valor >= 0) {
+            return Math.round(valor);
+        }
+
+        if (typeof valor === 'string' && /^\d+$/.test(valor.trim())) {
+            return Number(valor);
+        }
+
+        return null;
     }
 
     function escribir(id, valor) {
@@ -70,20 +110,37 @@
             escribir('usuarios-nota', usuarios.nota);
             escribir('usuarios-registrados', String(usuarios.total));
             escribir('usuarios-habilitados', String(usuarios.habilitados));
-            escribir('usuarios-sesiones', String(usuarios.sesionesActivas));
+            escribir('usuarios-inhabilitados', String(usuarios.inhabilitados));
             escribir('usuarios-roles', usuarios.rolesTexto);
-            escribir('usuarios-ultimo-acceso', datos.ultimoAcceso);
             escribir('usuarios-fallidos', String(datos.intentosFallidos));
             escribir('acceso-usuarios', String(usuarios.total));
             escribir('acceso-roles', String(datos.roles));
-            escribir('acceso-auditoria', String(datos.auditoria));
             escribir('arquitectura-resumen', 'PostgreSQL conectado · ClickHouse pendiente de integración · Redpanda pendiente de integración.');
             escribir('pg-detalle', motor.detalle);
             escribir('pg-nota', motor.nota);
             escribir('servicio-postgres', motor.servicio);
             escribir('servicio-postgres-estado', motor.conectado === true ? 'Conectado' : 'No disponible');
 
-            escribir('latencia-valor', milisegundos(datos.latenciaRedMs));
+            if (datos.aplicacion) {
+                escribir('servicio-php', datos.aplicacion.servicio || 'Aplicación PHP');
+                escribir('servicio-php-estado', datos.aplicacion.estado || 'No disponible');
+            }
+
+            escribir('latencia-valor', milisegundosDecimales(datos.latencia_red_ms));
+
+            var artificial = milisegundosEnteros(datos.latenciaRedMs);
+
+            if (artificial === null) {
+                escribir('latencia-artificial-valor', 'No disponible');
+                escribir('latencia-artificial-nota', 'Retardo configurado');
+            } else if (artificial === 0) {
+                escribir('latencia-artificial-valor', '0 ms');
+                escribir('latencia-artificial-nota', 'Sin degradación artificial');
+            } else {
+                escribir('latencia-artificial-valor', artificial + ' ms');
+                escribir('latencia-artificial-nota', 'Degradación simulada activa');
+            }
+
             escribir('tiempo-postgres', milisegundos(datos.tiempoPostgresMs));
         }).catch(function () {
             marcarNoDisponible();

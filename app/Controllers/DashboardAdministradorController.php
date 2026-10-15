@@ -3,6 +3,7 @@
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
 use App\Models\Usuario;
+use App\Services\EstadoSistemaService;
 use Illuminate\Database\Capsule\Manager as DB;
 
 header('Content-Type: application/json; charset=utf-8');
@@ -52,6 +53,9 @@ switch ($op) {
     case 'obtenerResumenAdministrador':
         obtenerResumenAdministrador();
         break;
+    case 'obtenerSenales':
+        obtenerSenales();
+        break;
     default:
         responder(400, [
             'exito' => false,
@@ -59,27 +63,43 @@ switch ($op) {
         ]);
 }
 
-function obtenerResumenAdministrador(): void
+function obtenerSenales(): void
 {
-    $sesionValida = false;
+    exigirAdministrador();
 
-    if (isset($_COOKIE[session_name()])) {
-        session_start();
-        $sesionValida = isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
-            && $_SESSION['rol'] === 'Administrador';
-    }
+    try {
+        $estado = EstadoSistemaService::obtenerEstadoActual();
+        $postgres = is_array($estado['postgresql'] ?? null) ? $estado['postgresql'] : [];
+        $toxiproxy = is_array($estado['toxiproxy'] ?? null) ? $estado['toxiproxy'] : [];
+        $milisegundos = $toxiproxy['latencia_configurada_ms'] ?? null;
+        $latencia = 'No disponible';
 
-    if (!$sesionValida) {
-        responder(403, [
+        if (is_int($milisegundos) || (is_string($milisegundos) && preg_match('/^\d+$/', $milisegundos) === 1)) {
+            $latencia = ((int) $milisegundos) . ' ms';
+        }
+
+        responder(200, [
+            'exito' => true,
+            'disponibilidad' => ($postgres['estado'] ?? null) === 'Conectado' ? 'Operativo' : 'No disponible',
+            'latencia' => $latencia,
+        ]);
+    } catch (Throwable $e) {
+        error_log('AWR obtenerSenales: ' . $e->getMessage());
+        responder(500, [
             'exito' => false,
             'mensaje' => 'No disponible',
         ]);
     }
+}
+
+function obtenerResumenAdministrador(): void
+{
+    exigirAdministrador();
 
     try {
         $total = (int) Usuario::query()->count();
         $habilitados = (int) Usuario::query()->where('estado', true)->count();
-        $ultimoAcceso = Usuario::query()->max('ultimo_acceso');
+        $inhabilitados = (int) Usuario::query()->where('estado', false)->count();
 
         $porRol = [
             'Administrador' => 0,
@@ -103,72 +123,60 @@ function obtenerResumenAdministrador(): void
             }
         }
 
-        $sesionesActivas = (int) DB::table('sesion_usuario')
-            ->where('estado', true)
-            ->whereRaw('fecha_expiracion > NOW()')
-            ->count();
-
         $intentosFallidos = (int) DB::table('auditoria_login')
             ->where('resultado', 'FALLIDO')
             ->count();
 
-        $auditoria = (int) DB::table('auditoria_login')->count();
         $roles = (int) DB::table('rol')->count();
 
-        $motor = DB::selectOne(
-            "SELECT current_setting('server_version') AS version,
-                    inet_server_port() AS puerto,
-                    (SELECT COUNT(*)::int
-                       FROM information_schema.tables
-                      WHERE table_schema = 'public'
-                        AND table_type = 'BASE TABLE') AS tablas"
-        );
-
-        $version = versionPostgres($motor->version ?? null);
-        $tablas = (int) ($motor->tablas ?? 0);
-        $puerto = (int) ($motor->puerto ?? 0);
-        $latenciaRedMs = obtenerLatenciaToxiproxy();
-        $tiempoPostgresMs = medirTiempoRespuestaPostgres();
+        $estado = EstadoSistemaService::obtenerEstadoActual();
+        $motor = $estado['postgresql'];
+        $aplicacion = is_array($estado['aplicacion'] ?? null) ? $estado['aplicacion'] : [];
+        $versionPhp = is_string($aplicacion['version_php'] ?? null) ? $aplicacion['version_php'] : '';
+        $conectado = ($motor['estado'] ?? null) === 'Conectado';
+        $version = is_string($motor['version'] ?? null) ? $motor['version'] : 'No disponible';
+        $tablas = is_int($motor['tablas'] ?? null) ? $motor['tablas'] : 0;
+        $puerto = is_int($motor['puerto'] ?? null) ? $motor['puerto'] : 0;
 
         responder(200, [
             'exito' => true,
             'usuarios' => [
                 'total' => $total,
                 'habilitados' => $habilitados,
+                'inhabilitados' => $inhabilitados,
                 'administrador' => $porRol['Administrador'],
                 'administrativo' => $porRol['Administrativo'],
                 'operador' => $porRol['Operador'],
-                'sesionesActivas' => $sesionesActivas,
                 'insignia' => $habilitados . ' habilitados',
                 'nota' => $porRol['Operador'] . ' operadores · '
                     . $porRol['Administrativo'] . ' administrativos · '
-                    . $porRol['Administrador'] . ' administrador · '
-                    . $sesionesActivas . ' sesiones',
+                    . $porRol['Administrador'] . ' administrador',
                 'rolesTexto' => $porRol['Administrador'] . ' Admin · '
                     . $porRol['Administrativo'] . ' Adm. · '
                     . $porRol['Operador'] . ' Op.',
             ],
-            'ultimoAcceso' => formatearAcceso(is_string($ultimoAcceso) ? $ultimoAcceso : null),
             'intentosFallidos' => $intentosFallidos,
             'roles' => $roles,
-            'auditoria' => $auditoria,
             'configuracion' => 'Pendiente',
-            'postgresql' => [
-                'conectado' => true,
-                'version' => $version,
-                'tablas' => $tablas,
-                'puerto' => $puerto,
-                'detalle' => 'PostgreSQL ' . $version . ' · ' . $tablas . ' tablas',
-                'nota' => 'Conectado',
-                'servicio' => $puerto > 0 ? 'PostgreSQL · ' . $puerto : 'PostgreSQL',
+            'aplicacion' => [
+                'estado' => ($aplicacion['estado'] ?? null) === 'Operativo' ? 'Operativo' : 'No disponible',
+                'servicio' => $versionPhp !== '' ? 'Aplicación PHP · ' . $versionPhp : 'Aplicación PHP',
             ],
-            'clickhouse' => 'Pendiente de integración',
-            'redpanda' => 'Pendiente de integración',
-            'latenciaRedMs' => $latenciaRedMs,
-            'tiempoPostgresMs' => $tiempoPostgresMs,
-            'disponibilidad' => 'Pendiente de monitoreo',
-            'seguridad' => 'Pendiente',
-            'rendimiento' => 'Pendiente de monitoreo',
+            'postgresql' => [
+                'conectado' => $conectado,
+                'version' => $conectado ? $version : 'No disponible',
+                'tablas' => $motor['tablas'] ?? null,
+                'puerto' => $motor['puerto'] ?? null,
+                'detalle' => $conectado
+                    ? 'PostgreSQL ' . $version . ' · ' . $tablas . ' tablas'
+                    : 'No disponible',
+                'nota' => $conectado ? 'Conectado' : 'No disponible',
+                'servicio' => $conectado && $puerto > 0 ? 'PostgreSQL · ' . $puerto : 'PostgreSQL',
+            ],
+            'latenciaRedMs' => $estado['toxiproxy']['latencia_configurada_ms'] ?? null,
+            'latencia_red_ms' => $estado['enlace']['latencia_red_ms'] ?? null,
+            'tiempoPostgresMs' => $motor['tiempo_respuesta_ms'] ?? null,
+            'estado' => $estado,
         ]);
     } catch (Throwable $e) {
         error_log('AWR obtenerResumenAdministrador: ' . $e->getMessage());
@@ -179,127 +187,22 @@ function obtenerResumenAdministrador(): void
     }
 }
 
-function obtenerLatenciaToxiproxy(): ?int
+function exigirAdministrador(): void
 {
-    if (!function_exists('curl_init')) {
-        return null;
+    $sesionValida = false;
+
+    if (isset($_COOKIE[session_name()])) {
+        session_start();
+        $sesionValida = isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
+            && $_SESSION['rol'] === 'Administrador';
     }
 
-    $curl = curl_init('http://localhost:8474/proxies/awr_postgres_proxy/toxics');
-
-    if ($curl === false) {
-        return null;
+    if (!$sesionValida) {
+        responder(403, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
     }
-
-    curl_setopt_array($curl, [
-        CURLOPT_HTTPGET => true,
-        CURLOPT_HTTPHEADER => [
-            'Accept: application/json',
-            'User-Agent: toxiproxy-cli',
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 2,
-        CURLOPT_TIMEOUT => 2,
-    ]);
-
-    $crudo = curl_exec($curl);
-    $codigo = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-    curl_close($curl);
-
-    if (!is_string($crudo) || $codigo !== 200) {
-        return null;
-    }
-
-    $lista = json_decode($crudo, true);
-
-    if (!is_array($lista)) {
-        return null;
-    }
-
-    foreach ($lista as $toxic) {
-        if (!is_array($toxic)) {
-            continue;
-        }
-
-        if (($toxic['name'] ?? null) !== 'awr_latency' || ($toxic['type'] ?? null) !== 'latency') {
-            continue;
-        }
-
-        $latencia = $toxic['attributes']['latency'] ?? null;
-
-        if (is_int($latencia) || (is_string($latencia) && preg_match('/^\d+$/', $latencia) === 1)) {
-            return (int) $latencia;
-        }
-
-        if (is_float($latencia) && floor($latencia) === $latencia) {
-            return (int) $latencia;
-        }
-
-        return null;
-    }
-
-    return 0;
-}
-
-function medirTiempoRespuestaPostgres(): ?int
-{
-    try {
-        $pdo = DB::connection()->getPdo();
-        $inicio = hrtime(true);
-        $resultado = $pdo->query('SELECT 1');
-
-        if ($resultado !== false) {
-            $resultado->fetchAll();
-        }
-
-        $milisegundos = (int) round((hrtime(true) - $inicio) / 1000000);
-
-        return $milisegundos >= 0 ? $milisegundos : null;
-    } catch (Throwable $e) {
-        error_log('AWR medirTiempoRespuestaPostgres: ' . $e->getMessage());
-
-        return null;
-    }
-}
-
-function versionPostgres(mixed $cruda): string
-{
-    $texto = trim((string) $cruda);
-    $corta = strtok($texto, ' ');
-
-    if (!is_string($corta) || !preg_match('/^\d+(?:\.\d+)*$/', $corta)) {
-        return 'Pendiente';
-    }
-
-    return $corta;
-}
-
-function formatearAcceso(?string $valor): string
-{
-    if ($valor === null || trim($valor) === '') {
-        return 'Pendiente';
-    }
-
-    $fecha = new DateTimeImmutable($valor);
-    $fecha = $fecha->setTimezone(new DateTimeZone('America/Guayaquil'));
-    $meses = [
-        1 => 'ene',
-        2 => 'feb',
-        3 => 'mar',
-        4 => 'abr',
-        5 => 'may',
-        6 => 'jun',
-        7 => 'jul',
-        8 => 'ago',
-        9 => 'sept',
-        10 => 'oct',
-        11 => 'nov',
-        12 => 'dic',
-    ];
-    $meridiano = $fecha->format('a') === 'am' ? 'a. m.' : 'p. m.';
-
-    return $fecha->format('j') . ' ' . $meses[(int) $fecha->format('n')] . ' ' . $fecha->format('Y')
-        . ', ' . $fecha->format('h:i') . ' ' . $meridiano;
 }
 
 function responder(int $codigo, array $cuerpo): void

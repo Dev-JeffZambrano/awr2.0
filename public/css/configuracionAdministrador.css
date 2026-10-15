@@ -1,0 +1,354 @@
+[hidden] {
+    display: none !important;
+}
+
+html {
+    scrollbar-gutter: stable;
+}
+
+.encabezado--configuracion,
+.bloque__cabeza,
+.acciones,
+.aviso--fila,
+.medida,
+.presets {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.bloque__cabeza {
+    align-items: flex-start;
+}
+
+.bloque__cabeza h2,
+.bloque__cabeza h3,
+.bloque__cabeza p,
+.nota,
+.aviso,
+.exito,
+.carga,
+.integracion p,
+.lista-ref {
+    margin: 0;
+}
+
+.bloque__cabeza p,
+.nota {
+    color: var(--color-texto-suave);
+    font-size: 0.9rem;
+}
+
+.actualizar,
+.secundario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2.35rem;
+    padding: 0 0.85rem;
+    color: var(--color-primario);
+    font: inherit;
+    font-weight: 600;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.actualizar {
+    color: #ffffff;
+    background: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
+.secundario:hover {
+    color: #ffffff;
+    background: var(--color-primario);
+    border-color: var(--color-primario);
+}
+
+.actualizar:disabled,
+.secundario:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.actualizar:focus-visible,
+.secundario:focus-visible,
+.selector input:focus-visible,
+.selector select:focus-visible,
+.selector textarea:focus-visible {
+    outline: 2px solid var(--color-foco);
+    outline-offset: 2px;
+}
+
+.actualizar[aria-busy="true"]::before,
+.carga[aria-busy="true"]::before,
+#actualizar-estado[aria-busy="true"]::before {
+    content: "";
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: giro 0.7s linear infinite;
+}
+
+.principal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.bloque,
+.integracion {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 1rem 1.1rem;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 1rem;
+}
+
+.integracion--destacada {
+    border-color: #b9d0f5;
+    background: #f8fbfe;
+}
+
+.integracion--neutral {
+    background: #f8fbfe;
+}
+
+.campos,
+.ficha,
+.referencias,
+.integraciones {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.campos,
+.referencias {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ficha {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.integraciones {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.integracion--destacada {
+    grid-column: 1 / -1;
+}
+
+.ancho {
+    grid-column: 1 / -1;
+}
+
+.ficha div,
+.lista-ref li {
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    background: #f8fbfe;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.75rem;
+}
+
+.ficha dt,
+.selector {
+    color: var(--color-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.ficha dd {
+    margin: 0.2rem 0 0;
+    font-weight: 700;
+}
+
+.selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.selector input,
+.selector select,
+.selector textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 0.55rem 0.75rem;
+    color: var(--color-texto);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 0.75rem;
+}
+
+.selector input,
+.selector select,
+.medida {
+    height: 2.45rem;
+}
+
+.selector textarea {
+    min-height: 5.2rem;
+    resize: vertical;
+}
+
+.medida {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: auto;
+}
+
+.medida input {
+    height: 2.45rem;
+}
+
+.medida > span {
+    color: var(--color-texto-suave);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.presets {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.carga {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--color-texto-suave);
+}
+
+.aviso {
+    padding: 0.75rem 0.9rem;
+    color: var(--color-error);
+    background: var(--color-error-fondo);
+    border: 1px solid var(--color-error-borde);
+    border-radius: 0.8rem;
+}
+
+.aviso--fila {
+    flex-wrap: wrap;
+}
+
+.exito {
+    color: #0c7a55;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.estado,
+.marca {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.14rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    border-radius: 999px;
+}
+
+.estado--ok {
+    color: #0c7a55;
+    background: #e8f8f1;
+}
+
+.estado--inactivo {
+    color: #52657c;
+    background: #f4f7fb;
+}
+
+.marca--codigo {
+    margin-right: 0.4rem;
+    color: #1d4e89;
+    background: #e7f0fb;
+}
+
+.lista-ref {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-ref li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.55rem;
+    align-items: baseline;
+}
+
+.lista-ref small,
+.referencia__meta {
+    color: var(--color-texto-suave);
+}
+
+.referencias h3,
+.integracion h3 {
+    margin: 0;
+    font-size: 0.98rem;
+}
+
+.referencias section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.acciones {
+    justify-content: flex-start;
+}
+
+@keyframes giro {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 1100px) {
+    .ficha,
+    .integraciones {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 720px) {
+    .encabezado--configuracion,
+    .bloque__cabeza,
+    .acciones {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .campos,
+    .ficha,
+    .referencias,
+    .integraciones {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
