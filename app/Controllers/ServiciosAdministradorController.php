@@ -108,8 +108,8 @@ function proyectarServicios(array $estado): array
                 is_array($estado['enlace'] ?? null) ? $estado['enlace'] : []
             ),
             servicioToxiproxy(is_array($estado['toxiproxy'] ?? null) ? $estado['toxiproxy'] : []),
-            servicioNoIntegrado('Redpanda', is_array($estado['redpanda'] ?? null) ? $estado['redpanda'] : []),
-            servicioNoIntegrado('ClickHouse', is_array($estado['clickhouse'] ?? null) ? $estado['clickhouse'] : []),
+            servicioRedpanda(is_array($estado['redpanda'] ?? null) ? $estado['redpanda'] : []),
+            servicioClickHouse(is_array($estado['clickhouse'] ?? null) ? $estado['clickhouse'] : []),
         ],
     ];
 }
@@ -168,15 +168,50 @@ function servicioToxiproxy(array $toxiproxy): array
     return $servicio;
 }
 
-function servicioNoIntegrado(string $nombre, array $componente): array
+function servicioRedpanda(array $redpanda): array
 {
-    $estado = textoEstado($componente['estado'] ?? null, 'No disponible');
+    $broker = is_string($redpanda['broker'] ?? null) ? trim($redpanda['broker']) : '';
+    $kafka = $redpanda['puerto_kafka'] ?? null;
+    $admin = $redpanda['puerto_admin'] ?? null;
+    $detalle = 'No disponible';
 
-    return [
-        'nombre' => $nombre,
-        'estado' => $estado,
-        'detalle' => $estado === 'No integrado' ? 'No integrado' : $estado,
+    if ($broker !== '' && is_int($kafka)) {
+        $detalle = $broker . ':' . $kafka;
+    }
+
+    $servicio = [
+        'nombre' => 'Redpanda',
+        'estado' => textoEstado($redpanda['estado'] ?? null, 'No disponible'),
+        'detalle' => $detalle,
     ];
+
+    if (is_int($admin)) {
+        $servicio['puerto_admin'] = $admin;
+    }
+
+    return $servicio;
+}
+
+function servicioClickHouse(array $clickhouse): array
+{
+    $version = is_string($clickhouse['version'] ?? null) ? trim($clickhouse['version']) : '';
+    $base = is_string($clickhouse['base'] ?? null) ? trim($clickhouse['base']) : '';
+    $partes = array_values(array_filter([$version, $base], static fn (string $parte): bool => $parte !== ''));
+    $servicio = [
+        'nombre' => 'ClickHouse',
+        'estado' => textoEstado($clickhouse['estado'] ?? null, 'No disponible'),
+        'detalle' => $partes === [] ? 'No disponible' : implode(' · ', $partes),
+    ];
+
+    if (is_int($clickhouse['tablas'] ?? null)) {
+        $servicio['tablas'] = $clickhouse['tablas'];
+    }
+
+    if (is_int($clickhouse['tiempo_respuesta_ms'] ?? null)) {
+        $servicio['respuesta_ms'] = $clickhouse['tiempo_respuesta_ms'];
+    }
+
+    return $servicio;
 }
 
 function textoEstado(mixed $estado, string $predeterminado): string

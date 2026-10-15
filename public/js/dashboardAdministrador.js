@@ -22,7 +22,18 @@
         'latencia-valor',
         'latencia-artificial-valor',
         'latencia-artificial-nota',
-        'tiempo-postgres'
+        'tiempo-postgres',
+        'tiempo-api',
+        'tiempo-rtt',
+        'rendimiento-insignia',
+        'rendimiento-texto',
+        'clickhouse-detalle',
+        'clickhouse-nota',
+        'redpanda-detalle',
+        'redpanda-nota',
+        'servicio-redpanda-estado',
+        'servicio-clickhouse-estado',
+        'rendimiento-clickhouse'
     ];
 
     function milisegundos(valor) {
@@ -79,6 +90,38 @@
         }
     }
 
+    function estadoRecibido(valor) {
+        if (valor === 'Operativo' || valor === 'Conectado' || valor === 'No disponible') {
+            return valor;
+        }
+
+        return 'No disponible';
+    }
+
+    function detalleClickHouse(clickhouse, estado) {
+        if (estado !== 'Conectado' || typeof clickhouse.version !== 'string' || typeof clickhouse.base !== 'string') {
+            return 'No disponible';
+        }
+
+        if (typeof clickhouse.tablas !== 'number' || !isFinite(clickhouse.tablas) || clickhouse.tablas < 0) {
+            return 'No disponible';
+        }
+
+        return 'ClickHouse ' + clickhouse.version + ' · ' + clickhouse.base + ' · ' + clickhouse.tablas + ' tablas';
+    }
+
+    function detalleRedpanda(redpanda, estado) {
+        if (estado !== 'Operativo' || typeof redpanda.broker !== 'string') {
+            return 'No disponible';
+        }
+
+        if (typeof redpanda.puerto_kafka !== 'number' || !isFinite(redpanda.puerto_kafka)) {
+            return 'No disponible';
+        }
+
+        return redpanda.broker + ':' + redpanda.puerto_kafka;
+    }
+
     function marcarNoDisponible() {
         camposReales.forEach(function (id) {
             escribir(id, 'No disponible');
@@ -115,7 +158,23 @@
             escribir('usuarios-fallidos', String(datos.intentosFallidos));
             escribir('acceso-usuarios', String(usuarios.total));
             escribir('acceso-roles', String(datos.roles));
-            escribir('arquitectura-resumen', 'PostgreSQL conectado · ClickHouse pendiente de integración · Redpanda pendiente de integración.');
+            var redpanda = datos.redpanda || {};
+            var clickhouse = datos.clickhouse || {};
+            var estadoRedpanda = estadoRecibido(redpanda.estado);
+            var estadoClickhouse = estadoRecibido(clickhouse.estado);
+
+            escribir('arquitectura-resumen', 'PostgreSQL ' + (motor.conectado === true ? 'conectado' : 'no disponible')
+                + ' · ClickHouse ' + estadoClickhouse.toLowerCase()
+                + ' · Redpanda ' + estadoRedpanda.toLowerCase() + '.');
+            escribir('clickhouse-nota', estadoClickhouse);
+            escribir('clickhouse-detalle', detalleClickHouse(clickhouse, estadoClickhouse));
+            escribir('servicio-clickhouse-estado', estadoClickhouse);
+            escribir('rendimiento-clickhouse', milisegundos(clickhouse.tiempo_respuesta_ms));
+            escribir('rendimiento-insignia', 'Observado');
+            escribir('rendimiento-texto', 'Tiempos de esta consulta.');
+            escribir('redpanda-nota', estadoRedpanda);
+            escribir('redpanda-detalle', detalleRedpanda(redpanda, estadoRedpanda));
+            escribir('servicio-redpanda-estado', estadoRedpanda);
             escribir('pg-detalle', motor.detalle);
             escribir('pg-nota', motor.nota);
             escribir('servicio-postgres', motor.servicio);
@@ -142,6 +201,8 @@
             }
 
             escribir('tiempo-postgres', milisegundos(datos.tiempoPostgresMs));
+            escribir('tiempo-api', milisegundos(datos.tiempoApiMs));
+            escribir('tiempo-rtt', milisegundosDecimales(datos.latencia_red_ms));
         }).catch(function () {
             marcarNoDisponible();
         });

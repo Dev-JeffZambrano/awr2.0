@@ -213,6 +213,12 @@ function proyectarMotores(array $estado): array
                 'rol' => 'OLAP',
                 'disponible' => $estadoClickhouse === 'Conectado' || $estadoClickhouse === 'Operativo',
                 'estado' => $estadoClickhouse,
+                'version' => $clickhouse['version'] ?? null,
+                'base' => $clickhouse['base'] ?? null,
+                'tablas' => $clickhouse['tablas'] ?? null,
+                'tamano_bytes' => $clickhouse['tamano_bytes'] ?? null,
+                'tiempo_respuesta_ms' => $clickhouse['tiempo_respuesta_ms'] ?? null,
+                'puerto' => $clickhouse['puerto'] ?? null,
             ],
         ],
         'arquitectura' => [

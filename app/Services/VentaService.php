@@ -16,6 +16,7 @@ class VentaService
     private const TIPO_FACTURA = '01';
     private const TIPO_OPERACION = 'FACTURA';
     private const TIPO_MOVIMIENTO = 'SALIDA_FACTURA';
+    private const TOPIC_FACTURAS_CONFIRMADAS = 'awr.facturas.confirmadas';
     private const CONSUMIDOR_FINAL = 'CONSUMIDOR_FINAL';
     private const LIMITE_BUSQUEDA = 15;
     private const LIMITE_LINEAS = 40;
@@ -345,6 +346,8 @@ class VentaService
                 throw new VentaRechazada('No disponible');
             }
 
+            self::publicarFacturaConfirmadaEnAnalitica((int) $creada->id_factura);
+
             return self::respuestaFactura($creada, false);
         } catch (VentaRechazada $e) {
             self::revertir();
@@ -669,6 +672,101 @@ class VentaService
             'total' => self::redondear($total),
             'stockSuficiente' => $stockSuficiente,
         ];
+    }
+
+    private static function publicarFacturaConfirmadaEnAnalitica(int $idFactura): void
+    {
+        try {
+            $pagos = DB::select(
+                'SELECT p.id_metodo_pago, mp.nombre AS nombre_metodo_pago
+                 FROM pago p
+                 JOIN metodo_pago mp ON mp.id_metodo_pago = p.id_metodo_pago
+                 WHERE p.id_factura = ?',
+                [$idFactura]
+            );
+            $lineas = DB::select(
+                'SELECT d.id_factura_detalle, f.id_factura, f.id_operacion, f.fecha_emision,
+                        f.numero_comprobante, f.id_sucursal, f.nombre_sucursal,
+                        f.id_punto_emision, f.codigo_punto_emision, f.id_cliente,
+                        f.tipo_identificacion_cliente, f.identificacion_cliente,
+                        f.razon_social_cliente, d.id_producto, d.codigo_producto,
+                        d.nombre_producto, d.nombre_categoria, d.cantidad,
+                        d.precio_unitario, d.costo_unitario, d.descuento,
+                        d.porcentaje_impuesto, d.subtotal, d.valor_impuesto, d.total_linea
+                 FROM factura f
+                 JOIN factura_detalle d ON d.id_factura = f.id_factura
+                 WHERE f.id_factura = ?
+                 ORDER BY d.id_factura_detalle',
+                [$idFactura]
+            );
+        } catch (Throwable $e) {
+            error_log('AWR confirmarVenta analitica: publicacion fallida');
+
+            return;
+        }
+
+        if (count($pagos) !== 1 || $lineas === []) {
+            error_log('AWR confirmarVenta analitica: publicacion fallida');
+
+            return;
+        }
+
+        $pago = $pagos[0];
+        $redpanda = new RedpandaService();
+
+        foreach ($lineas as $linea) {
+            try {
+                $redpanda->publicar(
+                    self::TOPIC_FACTURAS_CONFIRMADAS,
+                    self::eventoLineaConfirmada($linea, $pago),
+                    (string) $linea->id_factura_detalle
+                );
+            } catch (Throwable $e) {
+                error_log('AWR confirmarVenta analitica: publicacion fallida');
+            }
+        }
+    }
+
+    private static function eventoLineaConfirmada(object $linea, object $pago): array
+    {
+        return [
+            'id_factura_detalle' => (int) $linea->id_factura_detalle,
+            'id_factura' => (int) $linea->id_factura,
+            'id_operacion' => (string) $linea->id_operacion,
+            'fecha_emision' => self::fechaAnalitica($linea->fecha_emision),
+            'numero_comprobante' => (string) $linea->numero_comprobante,
+            'id_sucursal' => (int) $linea->id_sucursal,
+            'nombre_sucursal' => (string) $linea->nombre_sucursal,
+            'id_punto_emision' => (int) $linea->id_punto_emision,
+            'codigo_punto_emision' => (string) $linea->codigo_punto_emision,
+            'id_cliente' => (int) $linea->id_cliente,
+            'tipo_identificacion_cliente' => (string) $linea->tipo_identificacion_cliente,
+            'identificacion_cliente' => (string) $linea->identificacion_cliente,
+            'razon_social_cliente' => (string) $linea->razon_social_cliente,
+            'id_producto' => (int) $linea->id_producto,
+            'codigo_producto' => (string) $linea->codigo_producto,
+            'nombre_producto' => (string) $linea->nombre_producto,
+            'nombre_categoria' => (string) $linea->nombre_categoria,
+            'cantidad' => (int) $linea->cantidad,
+            'precio_unitario' => self::redondear((string) $linea->precio_unitario),
+            'costo_unitario' => self::redondear((string) $linea->costo_unitario),
+            'descuento' => self::redondear((string) $linea->descuento),
+            'porcentaje_impuesto' => self::redondear((string) $linea->porcentaje_impuesto),
+            'subtotal' => self::redondear((string) $linea->subtotal),
+            'valor_impuesto' => self::redondear((string) $linea->valor_impuesto),
+            'total_linea' => self::redondear((string) $linea->total_linea),
+            'id_metodo_pago' => (int) $pago->id_metodo_pago,
+            'nombre_metodo_pago' => (string) $pago->nombre_metodo_pago,
+        ];
+    }
+
+    private static function fechaAnalitica(mixed $valor): string
+    {
+        $fecha = $valor instanceof \DateTimeInterface
+            ? \DateTimeImmutable::createFromInterface($valor)
+            : new \DateTimeImmutable((string) $valor);
+
+        return $fecha->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.v');
     }
 
     private static function facturaDeOperacion(string $uuid): ?object

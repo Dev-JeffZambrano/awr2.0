@@ -144,7 +144,7 @@ $icono = static function (string $contenido): string {
                 <ul class="tope__senales" aria-label="Indicadores del sistema">
                     <li><span>Disponibilidad</span><strong id="senal-disponibilidad">…</strong></li>
                     <li><span>Latencia</span><strong id="senal-latencia">…</strong></li>
-                    <li><span>Sincronización</span><strong>Pendiente</strong></li>
+                    <li><span>Sincronización</span><strong id="senal-sincronizacion">…</strong></li>
                 </ul>
                 <div class="tope__cuenta">
                     <div class="tope__identidad">
@@ -200,7 +200,7 @@ $icono = static function (string $contenido): string {
         </div>
     </div>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/senalesAdministrador.js?v=1"></script>
-    <script src="public/js/serviciosAdministrador.js?v=1"></script>
+    <script src="public/js/senalesAdministrador.js?v=2"></script>
+    <script src="public/js/serviciosAdministrador.js?v=2"></script>
 </body>
 </html>

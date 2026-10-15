@@ -211,7 +211,18 @@
         if (motor.id === 'clickhouse') {
             if (motor.disponible !== true) {
                 article.appendChild(elemento('p', 'motor__rol', 'Motor analítico pendiente de integración.'));
+
+                return article;
             }
+
+            var analitico = elemento('dl', 'metricas');
+            analitico.appendChild(metrica('Versión', plano(motor.version)));
+            analitico.appendChild(metrica('Base', plano(motor.base)));
+            analitico.appendChild(metrica('Tablas', plano(motor.tablas)));
+            analitico.appendChild(metrica('Tamaño', tamano(motor.tamano_bytes)));
+            analitico.appendChild(metrica('Respuesta observada', milisegundos(motor.tiempo_respuesta_ms)));
+            analitico.appendChild(metrica('Puerto HTTP', plano(motor.puerto)));
+            article.appendChild(analitico);
 
             return article;
         }

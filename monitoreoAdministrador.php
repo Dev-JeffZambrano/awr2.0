@@ -144,7 +144,7 @@ $icono = static function (string $contenido): string {
                 <ul class="tope__senales" aria-label="Indicadores del sistema">
                     <li><span>Disponibilidad</span><strong id="senal-disponibilidad">…</strong></li>
                     <li><span>Latencia</span><strong id="senal-latencia">…</strong></li>
-                    <li><span>Sincronización</span><strong>Pendiente</strong></li>
+                    <li><span>Sincronización</span><strong id="senal-sincronizacion">…</strong></li>
                 </ul>
                 <div class="tope__cuenta">
                     <div class="tope__identidad">
@@ -252,18 +252,50 @@ $icono = static function (string $contenido): string {
                             </dl>
                         </article>
 
-                        <article class="componente componente--pendiente" id="card-redpanda">
+                        <article class="componente" id="card-redpanda">
                             <header class="componente__cabeza">
                                 <h2>Redpanda</h2>
                                 <p class="estado" id="redpanda-estado">…</p>
                             </header>
+                            <dl>
+                                <div>
+                                    <dt>Broker</dt>
+                                    <dd id="redpanda-broker">…</dd>
+                                </div>
+                                <div>
+                                    <dt>Puerto Kafka</dt>
+                                    <dd id="redpanda-kafka">…</dd>
+                                </div>
+                                <div>
+                                    <dt>Admin API</dt>
+                                    <dd id="redpanda-admin">…</dd>
+                                </div>
+                            </dl>
                         </article>
 
-                        <article class="componente componente--pendiente" id="card-clickhouse">
+                        <article class="componente" id="card-clickhouse">
                             <header class="componente__cabeza">
                                 <h2>ClickHouse</h2>
                                 <p class="estado" id="clickhouse-estado">…</p>
                             </header>
+                            <dl>
+                                <div>
+                                    <dt>Versión</dt>
+                                    <dd id="clickhouse-version">…</dd>
+                                </div>
+                                <div>
+                                    <dt>Base</dt>
+                                    <dd id="clickhouse-base">…</dd>
+                                </div>
+                                <div>
+                                    <dt>Tablas</dt>
+                                    <dd id="clickhouse-tablas">…</dd>
+                                </div>
+                                <div>
+                                    <dt>Respuesta observada</dt>
+                                    <dd id="clickhouse-respuesta">…</dd>
+                                </div>
+                            </dl>
                         </article>
                     </section>
 
@@ -302,7 +334,7 @@ $icono = static function (string $contenido): string {
         </div>
     </div>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/senalesAdministrador.js?v=1"></script>
-    <script src="public/js/monitoreoAdministrador.js?v=2"></script>
+    <script src="public/js/senalesAdministrador.js?v=2"></script>
+    <script src="public/js/monitoreoAdministrador.js?v=3"></script>
 </body>
 </html>

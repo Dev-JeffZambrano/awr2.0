@@ -182,6 +182,20 @@
             ));
         }
 
+        if (tiene(servicio, 'puerto_admin')) {
+            var admin = entero(servicio.puerto_admin);
+            metricas.appendChild(fila('Admin API', admin === null ? 'No disponible' : String(admin)));
+        }
+
+        if (tiene(servicio, 'tablas')) {
+            var tablas = entero(servicio.tablas);
+            metricas.appendChild(fila('Tablas', tablas === null ? 'No disponible' : tablas + ' tablas'));
+        }
+
+        if (tiene(servicio, 'respuesta_ms')) {
+            metricas.appendChild(fila('Respuesta observada', milisegundos(servicio.respuesta_ms)));
+        }
+
         if (metricas.childElementCount > 0) {
             article.appendChild(metricas);
         }

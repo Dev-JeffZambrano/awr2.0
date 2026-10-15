@@ -78,10 +78,28 @@ function obtenerSenales(): void
             $latencia = ((int) $milisegundos) . ' ms';
         }
 
+        $conectado = ($postgres['estado'] ?? null) === 'Conectado';
+        $sincronizacion = 'No disponible';
+
+        if ($conectado) {
+            $pendientes = DB::table('operacion_idempotente as o')
+                ->where('o.tipo_operacion', 'FACTURA')
+                ->whereNotExists(function ($consulta) {
+                    $consulta->selectRaw('1')
+                        ->from('factura as f')
+                        ->whereColumn('f.id_operacion', 'o.id_operacion');
+                })
+                ->count();
+            $sincronizacion = $pendientes === 0
+                ? 'Al día'
+                : $pendientes . ($pendientes === 1 ? ' pendiente' : ' pendientes');
+        }
+
         responder(200, [
             'exito' => true,
-            'disponibilidad' => ($postgres['estado'] ?? null) === 'Conectado' ? 'Operativo' : 'No disponible',
+            'disponibilidad' => $conectado ? 'Operativo' : 'No disponible',
             'latencia' => $latencia,
+            'sincronizacion' => $sincronizacion,
         ]);
     } catch (Throwable $e) {
         error_log('AWR obtenerSenales: ' . $e->getMessage());
@@ -97,6 +115,7 @@ function obtenerResumenAdministrador(): void
     exigirAdministrador();
 
     try {
+        $inicioApi = hrtime(true);
         $total = (int) Usuario::query()->count();
         $habilitados = (int) Usuario::query()->where('estado', true)->count();
         $inhabilitados = (int) Usuario::query()->where('estado', false)->count();
@@ -176,6 +195,9 @@ function obtenerResumenAdministrador(): void
             'latenciaRedMs' => $estado['toxiproxy']['latencia_configurada_ms'] ?? null,
             'latencia_red_ms' => $estado['enlace']['latencia_red_ms'] ?? null,
             'tiempoPostgresMs' => $motor['tiempo_respuesta_ms'] ?? null,
+            'tiempoApiMs' => (int) round((hrtime(true) - $inicioApi) / 1000000),
+            'redpanda' => proyectarRedpanda(is_array($estado['redpanda'] ?? null) ? $estado['redpanda'] : []),
+            'clickhouse' => proyectarClickHouse(is_array($estado['clickhouse'] ?? null) ? $estado['clickhouse'] : []),
             'estado' => $estado,
         ]);
     } catch (Throwable $e) {
@@ -185,6 +207,33 @@ function obtenerResumenAdministrador(): void
             'mensaje' => 'No disponible',
         ]);
     }
+}
+
+function proyectarRedpanda(array $redpanda): array
+{
+    $operativo = ($redpanda['estado'] ?? null) === 'Operativo';
+
+    return [
+        'estado' => $operativo ? 'Operativo' : 'No disponible',
+        'broker' => $operativo && is_string($redpanda['broker'] ?? null) ? $redpanda['broker'] : null,
+        'puerto_kafka' => $operativo && is_int($redpanda['puerto_kafka'] ?? null) ? $redpanda['puerto_kafka'] : null,
+        'puerto_admin' => $operativo && is_int($redpanda['puerto_admin'] ?? null) ? $redpanda['puerto_admin'] : null,
+    ];
+}
+
+function proyectarClickHouse(array $clickhouse): array
+{
+    $conectado = ($clickhouse['estado'] ?? null) === 'Conectado';
+
+    return [
+        'estado' => $conectado ? 'Conectado' : 'No disponible',
+        'version' => $conectado && is_string($clickhouse['version'] ?? null) ? $clickhouse['version'] : null,
+        'base' => $conectado && is_string($clickhouse['base'] ?? null) ? $clickhouse['base'] : null,
+        'tablas' => $conectado && is_int($clickhouse['tablas'] ?? null) ? $clickhouse['tablas'] : null,
+        'tiempo_respuesta_ms' => $conectado && is_int($clickhouse['tiempo_respuesta_ms'] ?? null)
+            ? $clickhouse['tiempo_respuesta_ms']
+            : null,
+    ];
 }
 
 function exigirAdministrador(): void

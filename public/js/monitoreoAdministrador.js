@@ -209,7 +209,15 @@
         escribir('toxi-latencia', latenciaConfigurada(toxiproxy.latencia_configurada_ms));
 
         pintarEstado('redpanda-estado', redpanda.estado);
+        escribir('redpanda-broker', texto(redpanda.broker));
+        escribir('redpanda-kafka', entero(redpanda.puerto_kafka) === null ? 'No disponible' : String(entero(redpanda.puerto_kafka)));
+        escribir('redpanda-admin', entero(redpanda.puerto_admin) === null ? 'No disponible' : String(entero(redpanda.puerto_admin)));
+
         pintarEstado('clickhouse-estado', clickhouse.estado);
+        escribir('clickhouse-version', versionConPrefijo('ClickHouse', clickhouse.version));
+        escribir('clickhouse-base', texto(clickhouse.base));
+        escribir('clickhouse-tablas', entero(clickhouse.tablas) === null ? 'No disponible' : entero(clickhouse.tablas) + ' tablas');
+        escribir('clickhouse-respuesta', milisegundos(clickhouse.tiempo_respuesta_ms));
 
         escribir('impacto-red', milisegundosDecimales(latencias.latencia_red_ms));
         escribir('impacto-artificial', latencia === null ? 'No disponible' : latencia + ' ms');

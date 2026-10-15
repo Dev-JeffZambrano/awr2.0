@@ -143,7 +143,7 @@ $icono = static function (string $contenido): string {
                 <ul class="tope__senales" aria-label="Indicadores del sistema">
                     <li><span>Disponibilidad</span><strong id="senal-disponibilidad">…</strong></li>
                     <li><span>Latencia</span><strong id="senal-latencia">…</strong></li>
-                    <li><span>Sincronización</span><strong>Pendiente</strong></li>
+                    <li><span>Sincronización</span><strong id="senal-sincronizacion">…</strong></li>
                 </ul>
                 <div class="tope__cuenta">
                     <div class="tope__identidad">
@@ -237,8 +237,8 @@ $icono = static function (string $contenido): string {
                             </div>
                             <div>
                                 <h3>ClickHouse</h3>
-                                <p>Estado: Pendiente de integración</p>
-                                <p class="nota-pendiente">Pendiente de integración</p>
+                                <p id="clickhouse-detalle">…</p>
+                                <p class="nota-pendiente" id="clickhouse-nota">…</p>
                             </div>
                         </article>
                         <article class="tarjeta tarjeta--motor">
@@ -247,8 +247,8 @@ $icono = static function (string $contenido): string {
                             </div>
                             <div>
                                 <h3>Redpanda</h3>
-                                <p>Estado: Pendiente de integración</p>
-                                <p class="nota-pendiente">Pendiente de integración</p>
+                                <p id="redpanda-detalle">…</p>
+                                <p class="nota-pendiente" id="redpanda-nota">…</p>
                             </div>
                         </article>
                     </div>
@@ -264,23 +264,23 @@ $icono = static function (string $contenido): string {
                         <ul class="lista">
                             <li><span><i class="punto" aria-hidden="true"></i><span id="servicio-php">Aplicación PHP</span></span><strong id="servicio-php-estado">…</strong></li>
                             <li><span><i class="punto" aria-hidden="true"></i><span id="servicio-postgres">PostgreSQL</span></span><strong id="servicio-postgres-estado">…</strong></li>
-                            <li><span><i class="punto" aria-hidden="true"></i>Redpanda</span><strong>Pendiente</strong></li>
-                            <li><span><i class="punto" aria-hidden="true"></i>ClickHouse</span><strong>Pendiente</strong></li>
+                            <li><span><i class="punto" aria-hidden="true"></i>Redpanda</span><strong id="servicio-redpanda-estado">…</strong></li>
+                            <li><span><i class="punto" aria-hidden="true"></i>ClickHouse</span><strong id="servicio-clickhouse-estado">…</strong></li>
                         </ul>
                     </section>
 
                     <section class="panel" aria-labelledby="titulo-rendimiento">
                         <div class="panel__cabeza">
                             <h2 id="titulo-rendimiento">Rendimiento del Sistema &amp; Hardware</h2>
-                            <span class="insignia">Pendiente</span>
+                            <span class="insignia" id="rendimiento-insignia">…</span>
                         </div>
-                        <p class="panel__texto">Pendiente de monitoreo.</p>
+                        <p class="panel__texto" id="rendimiento-texto">…</p>
                         <ul class="lista lista--pista">
-                            <li><span>Tiempo API</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
+                            <li><span>Tiempo API</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-api">…</strong></li>
                             <li><span>Respuesta PostgreSQL</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-postgres">…</strong></li>
-                            <li><span>RTT</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
-                            <li><span>Throughput</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
-                            <li><span>ClickHouse</span><span class="pista" aria-hidden="true"></span><strong>Pendiente</strong></li>
+                            <li><span>RTT</span><span class="pista" aria-hidden="true"></span><strong id="tiempo-rtt">…</strong></li>
+                            <li><span>Throughput</span><span class="pista" aria-hidden="true"></span><strong>No medido</strong></li>
+                            <li><span>ClickHouse</span><span class="pista" aria-hidden="true"></span><strong id="rendimiento-clickhouse">…</strong></li>
                         </ul>
                     </section>
                 </div>
@@ -329,7 +329,7 @@ $icono = static function (string $contenido): string {
         </div>
     </div>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/senalesAdministrador.js?v=1"></script>
-    <script src="public/js/dashboardAdministrador.js?v=6"></script>
+    <script src="public/js/senalesAdministrador.js?v=2"></script>
+    <script src="public/js/dashboardAdministrador.js?v=8"></script>
 </body>
 </html>
