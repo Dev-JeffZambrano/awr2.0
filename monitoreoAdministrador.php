@@ -58,7 +58,7 @@ $icono = static function (string $contenido): string {
     <title>Monitoreo en Tiempo Real | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
     <link rel="stylesheet" href="public/css/dashboardAdministrador.css?v=3">
-    <link rel="stylesheet" href="public/css/monitoreoAdministrador.css?v=7">
+    <link rel="stylesheet" href="public/css/monitoreoAdministrador.css?v=9">
 </head>
 <body>
     <div class="mando">
@@ -299,6 +299,35 @@ $icono = static function (string $contenido): string {
                         </article>
                     </section>
 
+                    <section class="resiliencia" aria-labelledby="titulo-resiliencia">
+                        <div class="resiliencia__cabeza">
+                            <div>
+                                <h2 id="titulo-resiliencia">Operaciones en Resiliencia</h2>
+                                <p class="resiliencia__ayuda">Cola real de facturas pendientes según el lag del consumidor.</p>
+                            </div>
+                            <button type="button" class="resiliencia__boton" id="btn-ver-pendientes">
+                                Ver facturas pendientes
+                            </button>
+                        </div>
+                        <div class="resiliencia__metricas">
+                            <article>
+                                <h3>Facturas pendientes</h3>
+                                <p class="resiliencia__cifra" id="resiliencia-pendientes">…</p>
+                                <p class="resiliencia__sub" id="resiliencia-nota">…</p>
+                            </article>
+                            <article>
+                                <h3>Redpanda</h3>
+                                <p class="estado" id="resiliencia-redpanda">…</p>
+                                <p class="resiliencia__sub">Estado del broker</p>
+                            </article>
+                            <article>
+                                <h3>Consumidor</h3>
+                                <p class="estado" id="resiliencia-consumidor">…</p>
+                                <p class="resiliencia__sub" id="resiliencia-consumidor-detalle">Grupo de reproceso</p>
+                            </article>
+                        </div>
+                    </section>
+
                     <section class="impacto" aria-labelledby="titulo-impacto">
                         <div class="impacto__cabeza">
                             <h2 id="titulo-impacto">Impacto de la latencia</h2>
@@ -333,8 +362,40 @@ $icono = static function (string $contenido): string {
             </main>
         </div>
     </div>
+
+    <dialog class="resiliencia-modal" id="modal-pendientes" aria-labelledby="titulo-modal-pendientes">
+        <div class="resiliencia-modal__cabeza">
+            <div>
+                <h2 id="titulo-modal-pendientes">Facturas pendientes</h2>
+                <p id="modal-pendientes-nota">Operaciones esperando reproceso</p>
+            </div>
+            <button type="button" class="resiliencia-modal__cerrar" id="cerrar-modal-pendientes" aria-label="Cerrar">
+                Cerrar
+            </button>
+        </div>
+        <div class="resiliencia-modal__cuerpo">
+            <p class="resiliencia-modal__vacio" id="modal-pendientes-vacio" hidden>Sin operaciones pendientes</p>
+            <p class="resiliencia-modal__aviso" id="modal-pendientes-aviso" hidden>No disponible</p>
+            <p class="resiliencia-modal__carga" id="modal-pendientes-carga" hidden>Consultando operaciones pendientes…</p>
+            <div class="resiliencia-modal__acciones" id="modal-pendientes-acciones" hidden>
+                <label class="resiliencia-modal__todas">
+                    <input type="checkbox" id="check-seleccionar-todas">
+                    Seleccionar todas
+                </label>
+                <button type="button" class="resiliencia__boton" id="btn-procesar-seleccionadas">
+                    Procesar seleccionadas
+                </button>
+            </div>
+            <div class="resiliencia-modal__tabla-wrap" id="modal-pendientes-lista" hidden></div>
+            <div class="resiliencia-modal__detalle" id="modal-pendientes-detalle" hidden>
+                <h3>Productos</h3>
+                <ul id="modal-pendientes-productos"></ul>
+            </div>
+        </div>
+    </dialog>
+
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/senalesAdministrador.js?v=2"></script>
-    <script src="public/js/monitoreoAdministrador.js?v=3"></script>
+    <script src="public/js/monitoreoAdministrador.js?v=5"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+use App\Services\EstadoResilienciaService;
 use Illuminate\Database\Capsule\Manager as DB;
 
 header('Content-Type: application/json; charset=utf-8');
@@ -49,11 +50,31 @@ switch ($entrada['op'] ?? null) {
     case 'obtenerResumenOperador':
         obtenerResumenOperador();
         break;
+    case 'obtenerSenalesOperador':
+        obtenerSenalesOperador();
+        break;
     default:
         responder(400, [
             'exito' => false,
             'mensaje' => 'Operación no reconocida.',
         ]);
+}
+
+function obtenerSenalesOperador(): void
+{
+    $idUsuario = exigirOperador();
+
+    if ($idUsuario < 1) {
+        responder(403, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+
+    responder(200, [
+        'exito' => true,
+        'modoResiliente' => textoModoResiliente(),
+    ]);
 }
 
 function obtenerResumenOperador(): void
@@ -294,8 +315,8 @@ function obtenerResumenOperador(): void
             'facturasRecientes' => $facturasRecientes,
             'stock' => $itemsStock,
             'sincronizacion' => 'Pendiente',
-            'modoResiliente' => 'Pendiente de integración',
-            'operacionesPendientes' => 'Pendiente',
+            'modoResiliente' => textoModoResiliente(),
+            'operacionesPendientes' => proyectarOperacionesPendientesSucursal($idSucursal),
         ]);
     } catch (Throwable $e) {
         error_log('AWR obtenerResumenOperador: ' . $e->getMessage());
@@ -304,6 +325,52 @@ function obtenerResumenOperador(): void
             'mensaje' => 'No disponible',
         ]);
     }
+}
+
+function textoModoResiliente(): string
+{
+    $resumen = EstadoResilienciaService::obtenerResumen();
+
+    return ($resumen['disponible'] ?? false) === true ? 'Disponible' : 'No disponible';
+}
+
+function exigirOperador(): int
+{
+    $idUsuario = 0;
+
+    if (isset($_COOKIE[session_name()])) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        $rol = $_SESSION['rol'] ?? null;
+        $id = $_SESSION['id_usuario'] ?? null;
+
+        if ($rol === 'Operador' && is_numeric($id) && (int) $id > 0) {
+            $idUsuario = (int) $id;
+        }
+    }
+
+    return $idUsuario;
+}
+
+function proyectarOperacionesPendientesSucursal(int $idSucursal): array
+{
+    $estado = EstadoResilienciaService::obtenerCantidadPendientesSucursal($idSucursal);
+
+    if (($estado['disponible'] ?? false) !== true || !is_int($estado['cantidad'] ?? null)) {
+        return [
+            'disponible' => false,
+            'cantidad' => null,
+            'valor' => 'No disponible',
+        ];
+    }
+
+    return [
+        'disponible' => true,
+        'cantidad' => $estado['cantidad'],
+        'valor' => (string) $estado['cantidad'],
+    ];
 }
 
 function participar(array $filas): array

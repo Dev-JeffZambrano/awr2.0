@@ -4,8 +4,24 @@
     var carga = document.getElementById('carga-monitoreo');
     var aviso = document.getElementById('aviso-monitoreo');
     var panel = document.getElementById('panel-monitoreo');
+    var btnPendientes = document.getElementById('btn-ver-pendientes');
+    var modalPendientes = document.getElementById('modal-pendientes');
+    var cerrarModalPendientes = document.getElementById('cerrar-modal-pendientes');
+    var modalLista = document.getElementById('modal-pendientes-lista');
+    var modalDetalle = document.getElementById('modal-pendientes-detalle');
+    var modalProductos = document.getElementById('modal-pendientes-productos');
+    var modalVacio = document.getElementById('modal-pendientes-vacio');
+    var modalAviso = document.getElementById('modal-pendientes-aviso');
+    var modalCarga = document.getElementById('modal-pendientes-carga');
+    var modalNota = document.getElementById('modal-pendientes-nota');
+    var modalAcciones = document.getElementById('modal-pendientes-acciones');
+    var checkTodas = document.getElementById('check-seleccionar-todas');
+    var btnProcesarSeleccionadas = document.getElementById('btn-procesar-seleccionadas');
     var enCurso = false;
+    var detalleEnCurso = false;
+    var procesoEnCurso = false;
     var intervaloMs = 5000;
+    var operacionesPendientes = [];
 
     function escribir(id, valor) {
         var nodo = document.getElementById(id);
@@ -95,8 +111,12 @@
     }
 
     function claseEstado(valor) {
-        if (valor === 'Operativo' || valor === 'Conectado') {
+        if (valor === 'Operativo' || valor === 'Conectado' || valor === 'Activo') {
             return 'estado estado--ok';
+        }
+
+        if (valor === 'Inactivo') {
+            return 'estado estado--aviso';
         }
 
         if (valor === 'Degradado') {
@@ -223,6 +243,8 @@
         escribir('impacto-artificial', latencia === null ? 'No disponible' : latencia + ' ms');
         escribir('impacto-respuesta', milisegundos(latencias.tiempo_respuesta_postgresql_ms));
 
+        pintarResiliencia(datos.resiliencia || {});
+
         if (notaArtificial) {
             notaArtificial.hidden = latencia !== 0;
         }
@@ -240,6 +262,518 @@
 
         condicion.hidden = true;
         condicion.textContent = '';
+    }
+
+    function pintarResiliencia(resiliencia) {
+        var disponible = resiliencia.disponible === true;
+        var pendientes = entero(resiliencia.facturas_pendientes);
+
+        if (!disponible || pendientes === null) {
+            escribir('resiliencia-pendientes', 'No disponible');
+            escribir('resiliencia-nota', 'No disponible');
+            pintarEstado('resiliencia-redpanda', resiliencia.redpanda_estado || 'No disponible');
+            pintarEstado('resiliencia-consumidor', resiliencia.consumidor_estado || 'No disponible');
+            escribir('resiliencia-consumidor-detalle', 'Grupo de reproceso');
+            return;
+        }
+
+        escribir('resiliencia-pendientes', String(pendientes));
+        escribir(
+            'resiliencia-nota',
+            pendientes === 0
+                ? 'Sin operaciones pendientes'
+                : (typeof resiliencia.nota === 'string' ? resiliencia.nota : 'Operaciones esperando reproceso')
+        );
+        pintarEstado('resiliencia-redpanda', resiliencia.redpanda_estado || 'Operativo');
+        pintarEstado('resiliencia-consumidor', resiliencia.consumidor_estado || 'No disponible');
+        escribir(
+            'resiliencia-consumidor-detalle',
+            entero(resiliencia.consumidor_miembros) === null
+                ? 'Grupo de reproceso'
+                : (entero(resiliencia.consumidor_miembros) === 1
+                    ? '1 miembro activo'
+                    : entero(resiliencia.consumidor_miembros) + ' miembros activos')
+        );
+    }
+
+    function ocultarNodosModal() {
+        if (modalVacio) {
+            modalVacio.hidden = true;
+        }
+        if (modalAviso) {
+            modalAviso.hidden = true;
+        }
+        if (modalCarga) {
+            modalCarga.hidden = true;
+        }
+        if (modalAcciones) {
+            modalAcciones.hidden = true;
+        }
+        if (checkTodas) {
+            checkTodas.checked = false;
+        }
+        if (modalLista) {
+            modalLista.hidden = true;
+            modalLista.innerHTML = '';
+        }
+        if (modalDetalle) {
+            modalDetalle.hidden = true;
+        }
+        if (modalProductos) {
+            modalProductos.innerHTML = '';
+        }
+    }
+
+    function fechaCorta(valor) {
+        if (typeof valor !== 'string' || valor === '') {
+            return 'No disponible';
+        }
+
+        var fecha = new Date(valor);
+
+        if (isNaN(fecha.getTime())) {
+            return valor;
+        }
+
+        var dia = String(fecha.getDate()).padStart(2, '0');
+        var mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        var anio = fecha.getFullYear();
+        var hora = String(fecha.getHours()).padStart(2, '0');
+        var minuto = String(fecha.getMinutes()).padStart(2, '0');
+
+        return dia + '/' + mes + '/' + anio + ' ' + hora + ':' + minuto;
+    }
+
+    function textoProductos(cantidad) {
+        var n = entero(cantidad);
+
+        if (n === null) {
+            return 'No disponible';
+        }
+
+        return n === 1 ? '1 producto' : n + ' productos';
+    }
+
+    function idsSeleccionados() {
+        if (!modalLista) {
+            return [];
+        }
+
+        var checks = modalLista.querySelectorAll('input[data-id-operacion]:checked');
+        var ids = [];
+
+        Array.prototype.forEach.call(checks, function (nodo) {
+            var id = nodo.getAttribute('data-id-operacion');
+
+            if (id) {
+                ids.push(id);
+            }
+        });
+
+        return ids;
+    }
+
+    function sincronizarCheckTodas() {
+        if (!checkTodas || !modalLista) {
+            return;
+        }
+
+        var checks = modalLista.querySelectorAll('input[data-id-operacion]');
+        var marcados = modalLista.querySelectorAll('input[data-id-operacion]:checked');
+
+        checkTodas.checked = checks.length > 0 && checks.length === marcados.length;
+    }
+
+    function setProcesandoUi(activo) {
+        procesoEnCurso = activo;
+
+        if (btnProcesarSeleccionadas) {
+            btnProcesarSeleccionadas.disabled = activo;
+        }
+
+        if (checkTodas) {
+            checkTodas.disabled = activo;
+        }
+
+        if (!modalLista) {
+            return;
+        }
+
+        var controles = modalLista.querySelectorAll('input[data-id-operacion], button[data-procesar]');
+
+        Array.prototype.forEach.call(controles, function (nodo) {
+            nodo.disabled = activo;
+        });
+    }
+
+    function pintarDetalleProductos(operacion) {
+        if (!modalDetalle || !modalProductos) {
+            return;
+        }
+
+        var productos = Array.isArray(operacion.productos) ? operacion.productos : [];
+        modalProductos.innerHTML = '';
+
+        if (productos.length === 0) {
+            modalDetalle.hidden = true;
+            return;
+        }
+
+        productos.forEach(function (producto) {
+            var item = document.createElement('li');
+            var nombre = producto.nombre_producto ? ' · ' + producto.nombre_producto : '';
+            item.textContent = 'id_producto ' + texto(producto.id_producto)
+                + ' · cantidad ' + texto(producto.cantidad)
+                + nombre;
+            modalProductos.appendChild(item);
+        });
+
+        modalDetalle.hidden = false;
+    }
+
+    function pintarListaPendientes(operaciones) {
+        if (!modalLista) {
+            return;
+        }
+
+        modalLista.innerHTML = '';
+        operacionesPendientes = operaciones;
+
+        if (operaciones.length === 0) {
+            modalLista.hidden = true;
+
+            if (modalAcciones) {
+                modalAcciones.hidden = true;
+            }
+
+            return;
+        }
+
+        var tabla = document.createElement('table');
+        var thead = document.createElement('thead');
+        var tbody = document.createElement('tbody');
+        var filaCabeza = document.createElement('tr');
+        var encabezados = ['', 'ID operación', 'Fecha', 'Cliente', 'Punto de emisión', 'Productos', 'Estado', 'Acción'];
+
+        encabezados.forEach(function (titulo) {
+            var th = document.createElement('th');
+            th.textContent = titulo;
+            filaCabeza.appendChild(th);
+        });
+
+        thead.appendChild(filaCabeza);
+        tabla.appendChild(thead);
+
+        operaciones.forEach(function (operacion, indice) {
+            var fila = document.createElement('tr');
+            var cliente = operacion.cliente
+                ? operacion.cliente
+                : (operacion.id_cliente !== null && operacion.id_cliente !== undefined
+                    ? String(operacion.id_cliente)
+                    : 'No disponible');
+            var punto = operacion.punto_emision
+                ? operacion.punto_emision
+                : (operacion.id_punto_emision !== null && operacion.id_punto_emision !== undefined
+                    ? String(operacion.id_punto_emision)
+                    : 'No disponible');
+            var idOperacion = texto(operacion.id_operacion);
+
+            var tdCheck = document.createElement('td');
+            var check = document.createElement('input');
+            check.type = 'checkbox';
+            check.setAttribute('data-id-operacion', idOperacion);
+            check.addEventListener('change', sincronizarCheckTodas);
+            tdCheck.appendChild(check);
+
+            var tdId = document.createElement('td');
+            var enlaceId = document.createElement('button');
+            enlaceId.type = 'button';
+            enlaceId.className = 'resiliencia-modal__id';
+            enlaceId.textContent = idOperacion;
+            enlaceId.addEventListener('click', function () {
+                pintarDetalleProductos(operacionesPendientes[indice] || {});
+            });
+            tdId.appendChild(enlaceId);
+
+            var tdFecha = document.createElement('td');
+            tdFecha.textContent = fechaCorta(operacion.fecha_solicitud);
+
+            var tdCliente = document.createElement('td');
+            tdCliente.textContent = cliente;
+
+            var tdPunto = document.createElement('td');
+            tdPunto.textContent = punto;
+
+            var tdProductos = document.createElement('td');
+            tdProductos.textContent = textoProductos(operacion.cantidad_productos);
+
+            var tdEstado = document.createElement('td');
+            var spanEstado = document.createElement('span');
+            spanEstado.className = 'resiliencia-modal__estado';
+            spanEstado.setAttribute('data-estado-op', idOperacion);
+            spanEstado.textContent = operacion.estado || 'Pendiente';
+            tdEstado.appendChild(spanEstado);
+
+            var tdAccion = document.createElement('td');
+            var btnProcesar = document.createElement('button');
+            btnProcesar.type = 'button';
+            btnProcesar.className = 'resiliencia-modal__procesar';
+            btnProcesar.setAttribute('data-procesar', idOperacion);
+            btnProcesar.textContent = 'Procesar';
+            btnProcesar.addEventListener('click', function () {
+                procesarUna(idOperacion);
+            });
+            tdAccion.appendChild(btnProcesar);
+
+            fila.appendChild(tdCheck);
+            fila.appendChild(tdId);
+            fila.appendChild(tdFecha);
+            fila.appendChild(tdCliente);
+            fila.appendChild(tdPunto);
+            fila.appendChild(tdProductos);
+            fila.appendChild(tdEstado);
+            fila.appendChild(tdAccion);
+            tbody.appendChild(fila);
+        });
+
+        tabla.appendChild(tbody);
+        modalLista.appendChild(tabla);
+        modalLista.hidden = false;
+
+        if (modalAcciones) {
+            modalAcciones.hidden = false;
+        }
+
+        sincronizarCheckTodas();
+    }
+
+    function aplicarResultadoEnFila(resultado) {
+        if (!resultado || typeof resultado.id_operacion !== 'string' || !modalLista) {
+            return;
+        }
+
+        var span = modalLista.querySelector('[data-estado-op="' + resultado.id_operacion + '"]');
+
+        if (!span) {
+            return;
+        }
+
+        span.textContent = resultado.estado || 'Error';
+        span.classList.remove(
+            'resiliencia-modal__estado--ok',
+            'resiliencia-modal__estado--aviso',
+            'resiliencia-modal__estado--error'
+        );
+
+        if (resultado.estado === 'Procesada') {
+            span.classList.add('resiliencia-modal__estado--ok');
+        } else if (resultado.estado === 'Sigue pendiente') {
+            span.classList.add('resiliencia-modal__estado--aviso');
+        } else {
+            span.classList.add('resiliencia-modal__estado--error');
+        }
+    }
+
+    function refrescarContadorResiliencia(bloque) {
+        if (!bloque || typeof bloque !== 'object') {
+            consultar();
+            return;
+        }
+
+        pintarResiliencia({
+            disponible: bloque.disponible === true,
+            facturas_pendientes: bloque.facturas_pendientes,
+            nota: bloque.nota,
+            redpanda_estado: bloque.disponible === true ? 'Operativo' : 'No disponible',
+            consumidor_estado: document.getElementById('resiliencia-consumidor')
+                ? document.getElementById('resiliencia-consumidor').textContent
+                : 'No disponible'
+        });
+    }
+
+    function cargarListadoPendientes(mostrarModal) {
+        if (detalleEnCurso || procesoEnCurso) {
+            return Promise.resolve();
+        }
+
+        if (typeof axios === 'undefined') {
+            ocultarNodosModal();
+
+            if (modalAviso) {
+                modalAviso.hidden = false;
+                modalAviso.textContent = 'No disponible';
+            }
+
+            if (mostrarModal && modalPendientes && typeof modalPendientes.showModal === 'function') {
+                modalPendientes.showModal();
+            }
+
+            return Promise.resolve();
+        }
+
+        detalleEnCurso = true;
+
+        if (btnPendientes) {
+            btnPendientes.disabled = true;
+        }
+
+        ocultarNodosModal();
+
+        if (modalCarga) {
+            modalCarga.hidden = false;
+        }
+
+        if (modalNota) {
+            modalNota.textContent = 'Consultando operaciones pendientes…';
+        }
+
+        if (mostrarModal && modalPendientes && typeof modalPendientes.showModal === 'function') {
+            modalPendientes.showModal();
+        }
+
+        return axios.post('app/Controllers/MonitoreoAdministradorController.php', {
+            op: 'obtenerFacturasPendientes'
+        }).then(function (respuesta) {
+            var datos = respuesta.data || {};
+            ocultarNodosModal();
+
+            if (datos.exito !== true || datos.disponible !== true) {
+                if (modalAviso) {
+                    modalAviso.hidden = false;
+                    modalAviso.textContent = 'No disponible';
+                }
+
+                if (modalNota) {
+                    modalNota.textContent = 'No disponible';
+                }
+
+                return;
+            }
+
+            var operaciones = Array.isArray(datos.operaciones) ? datos.operaciones : [];
+
+            if (modalNota) {
+                modalNota.textContent = typeof datos.nota === 'string' ? datos.nota : 'Operaciones esperando reproceso';
+            }
+
+            if (operaciones.length === 0) {
+                if (modalVacio) {
+                    modalVacio.hidden = false;
+                }
+
+                return;
+            }
+
+            pintarListaPendientes(operaciones);
+        }).catch(function () {
+            ocultarNodosModal();
+
+            if (modalAviso) {
+                modalAviso.hidden = false;
+                modalAviso.textContent = 'No disponible';
+            }
+
+            if (modalNota) {
+                modalNota.textContent = 'No disponible';
+            }
+        }).finally(function () {
+            detalleEnCurso = false;
+
+            if (btnPendientes) {
+                btnPendientes.disabled = false;
+            }
+        });
+    }
+
+    function abrirModalPendientes() {
+        if (!modalPendientes || typeof modalPendientes.showModal !== 'function') {
+            return;
+        }
+
+        cargarListadoPendientes(true);
+    }
+
+    function procesarUna(idOperacion) {
+        if (procesoEnCurso || typeof axios === 'undefined') {
+            return;
+        }
+
+        if (!window.confirm('¿Deseas procesar esta operación?')) {
+            return;
+        }
+
+        setProcesandoUi(true);
+
+        axios.post('app/Controllers/MonitoreoAdministradorController.php', {
+            op: 'procesarFacturaPendiente',
+            id_operacion: idOperacion
+        }).then(function (respuesta) {
+            var datos = respuesta.data || {};
+
+            if (datos.exito !== true || !datos.resultado) {
+                if (modalAviso) {
+                    modalAviso.hidden = false;
+                    modalAviso.textContent = 'No disponible';
+                }
+
+                return;
+            }
+
+            aplicarResultadoEnFila(datos.resultado);
+            refrescarContadorResiliencia(datos.resiliencia);
+        }).catch(function () {
+            if (modalAviso) {
+                modalAviso.hidden = false;
+                modalAviso.textContent = 'No disponible';
+            }
+        }).finally(function () {
+            setProcesandoUi(false);
+            cargarListadoPendientes(false);
+            consultar();
+        });
+    }
+
+    function procesarSeleccionadas() {
+        var ids = idsSeleccionados();
+
+        if (ids.length === 0 || procesoEnCurso || typeof axios === 'undefined') {
+            return;
+        }
+
+        if (!window.confirm('¿Deseas procesar ' + ids.length + ' operaciones pendientes?')) {
+            return;
+        }
+
+        setProcesandoUi(true);
+
+        axios.post('app/Controllers/MonitoreoAdministradorController.php', {
+            op: 'procesarFacturasPendientes',
+            id_operacion: ids
+        }).then(function (respuesta) {
+            var datos = respuesta.data || {};
+            var resultados = Array.isArray(datos.resultados) ? datos.resultados : [];
+
+            if (datos.exito !== true) {
+                if (modalAviso) {
+                    modalAviso.hidden = false;
+                    modalAviso.textContent = 'No disponible';
+                }
+
+                return;
+            }
+
+            resultados.forEach(aplicarResultadoEnFila);
+            refrescarContadorResiliencia(datos.resiliencia);
+        }).catch(function () {
+            if (modalAviso) {
+                modalAviso.hidden = false;
+                modalAviso.textContent = 'No disponible';
+            }
+        }).finally(function () {
+            setProcesandoUi(false);
+            cargarListadoPendientes(false);
+            consultar();
+        });
     }
 
     function mostrarAviso() {
@@ -323,6 +857,36 @@
 
     consultar();
     window.setInterval(consultar, intervaloMs);
+
+    if (btnPendientes) {
+        btnPendientes.addEventListener('click', abrirModalPendientes);
+    }
+
+    if (cerrarModalPendientes && modalPendientes) {
+        cerrarModalPendientes.addEventListener('click', function () {
+            if (typeof modalPendientes.close === 'function') {
+                modalPendientes.close();
+            }
+        });
+    }
+
+    if (checkTodas) {
+        checkTodas.addEventListener('change', function () {
+            if (!modalLista || procesoEnCurso) {
+                return;
+            }
+
+            var checks = modalLista.querySelectorAll('input[data-id-operacion]');
+
+            Array.prototype.forEach.call(checks, function (nodo) {
+                nodo.checked = checkTodas.checked;
+            });
+        });
+    }
+
+    if (btnProcesarSeleccionadas) {
+        btnProcesarSeleccionadas.addEventListener('click', procesarSeleccionadas);
+    }
 
     if (!boton) {
         return;

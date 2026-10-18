@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+use App\Services\EstadoResilienciaService;
 use App\Services\EstadoSistemaService;
 
 if (PHP_SAPI !== 'cli') {
@@ -34,7 +35,7 @@ function atenderSolicitudMonitoreo(): void
 
     $longitud = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
 
-    if ($longitud < 0 || $longitud > 4096) {
+    if ($longitud < 0 || $longitud > 65536) {
         responder(400, [
             'exito' => false,
             'mensaje' => 'Datos incompletos.',
@@ -57,6 +58,15 @@ function atenderSolicitudMonitoreo(): void
         case 'obtenerEstadoMonitoreo':
             obtenerEstadoMonitoreo();
             break;
+        case 'obtenerFacturasPendientes':
+            obtenerFacturasPendientes();
+            break;
+        case 'procesarFacturaPendiente':
+            procesarFacturaPendiente($entrada);
+            break;
+        case 'procesarFacturasPendientes':
+            procesarFacturasPendientes($entrada);
+            break;
         default:
             responder(400, [
                 'exito' => false,
@@ -66,6 +76,122 @@ function atenderSolicitudMonitoreo(): void
 }
 
 function obtenerEstadoMonitoreo(): void
+{
+    exigirAdministradorMonitoreo();
+
+    try {
+        $estado = EstadoSistemaService::obtenerEstadoActual();
+        $resiliencia = EstadoResilienciaService::obtenerResumen();
+        responder(200, proyectarMonitoreo($estado, $resiliencia));
+    } catch (Throwable $e) {
+        error_log('AWR obtenerEstadoMonitoreo: ' . $e->getMessage());
+        responder(500, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+}
+
+function obtenerFacturasPendientes(): void
+{
+    exigirAdministradorMonitoreo();
+
+    try {
+        $detalle = EstadoResilienciaService::obtenerOperacionesPendientes();
+        responder(200, [
+            'exito' => true,
+            'disponible' => ($detalle['disponible'] ?? false) === true,
+            'facturas_pendientes' => $detalle['facturas_pendientes'] ?? null,
+            'operaciones' => is_array($detalle['operaciones'] ?? null) ? $detalle['operaciones'] : [],
+            'nota' => is_string($detalle['nota'] ?? null) ? $detalle['nota'] : 'No disponible',
+        ]);
+    } catch (Throwable $e) {
+        error_log('AWR obtenerFacturasPendientes: ' . $e->getMessage());
+        responder(500, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+}
+
+function procesarFacturaPendiente(array $entrada): void
+{
+    exigirAdministradorMonitoreo();
+
+    $idOperacion = $entrada['id_operacion'] ?? null;
+
+    if (!is_string($idOperacion) || trim($idOperacion) === '') {
+        responder(400, [
+            'exito' => false,
+            'mensaje' => 'Datos incompletos.',
+        ]);
+    }
+
+    try {
+        $resultado = EstadoResilienciaService::procesarFacturaPendiente($idOperacion);
+        $resumen = EstadoResilienciaService::obtenerResumen();
+
+        responder(200, [
+            'exito' => true,
+            'resultado' => $resultado,
+            'resiliencia' => [
+                'disponible' => ($resumen['disponible'] ?? false) === true,
+                'facturas_pendientes' => $resumen['facturas_pendientes'] ?? null,
+                'nota' => $resumen['nota'] ?? 'No disponible',
+            ],
+        ]);
+    } catch (Throwable $e) {
+        error_log('AWR procesarFacturaPendiente: ' . $e->getMessage());
+        responder(500, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+}
+
+function procesarFacturasPendientes(array $entrada): void
+{
+    exigirAdministradorMonitoreo();
+
+    $ids = $entrada['id_operacion'] ?? null;
+
+    if (!is_array($ids) || $ids === []) {
+        responder(400, [
+            'exito' => false,
+            'mensaje' => 'Datos incompletos.',
+        ]);
+    }
+
+    if (count($ids) > 50) {
+        responder(400, [
+            'exito' => false,
+            'mensaje' => 'Datos incompletos.',
+        ]);
+    }
+
+    try {
+        $resultados = EstadoResilienciaService::procesarFacturasPendientes($ids);
+        $resumen = EstadoResilienciaService::obtenerResumen();
+
+        responder(200, [
+            'exito' => true,
+            'resultados' => $resultados,
+            'resiliencia' => [
+                'disponible' => ($resumen['disponible'] ?? false) === true,
+                'facturas_pendientes' => $resumen['facturas_pendientes'] ?? null,
+                'nota' => $resumen['nota'] ?? 'No disponible',
+            ],
+        ]);
+    } catch (Throwable $e) {
+        error_log('AWR procesarFacturasPendientes: ' . $e->getMessage());
+        responder(500, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+}
+
+function exigirAdministradorMonitoreo(): void
 {
     $sesionValida = false;
 
@@ -81,25 +207,19 @@ function obtenerEstadoMonitoreo(): void
             'mensaje' => 'No disponible',
         ]);
     }
-
-    try {
-        $estado = EstadoSistemaService::obtenerEstadoActual();
-        responder(200, proyectarMonitoreo($estado));
-    } catch (Throwable $e) {
-        error_log('AWR obtenerEstadoMonitoreo: ' . $e->getMessage());
-        responder(500, [
-            'exito' => false,
-            'mensaje' => 'No disponible',
-        ]);
-    }
 }
 
-function proyectarMonitoreo(array $estado): array
+function proyectarMonitoreo(array $estado, array $resiliencia): array
 {
     $aplicacion = is_array($estado['aplicacion'] ?? null) ? $estado['aplicacion'] : [];
     $postgresql = is_array($estado['postgresql'] ?? null) ? $estado['postgresql'] : [];
     $toxiproxy = is_array($estado['toxiproxy'] ?? null) ? $estado['toxiproxy'] : [];
     $fecha = new DateTimeImmutable('now', new DateTimeZone('America/Guayaquil'));
+    $disponible = ($resiliencia['disponible'] ?? false) === true;
+    $pendientes = $disponible && is_int($resiliencia['facturas_pendientes'] ?? null)
+        ? $resiliencia['facturas_pendientes']
+        : null;
+    $consumidor = is_array($resiliencia['consumidor'] ?? null) ? $resiliencia['consumidor'] : [];
 
     return [
         'exito' => true,
@@ -133,6 +253,22 @@ function proyectarMonitoreo(array $estado): array
         ],
         'redpanda' => is_array($estado['redpanda'] ?? null) ? $estado['redpanda'] : ['estado' => 'No disponible'],
         'clickhouse' => is_array($estado['clickhouse'] ?? null) ? $estado['clickhouse'] : ['estado' => 'No disponible'],
+        'resiliencia' => [
+            'disponible' => $disponible,
+            'facturas_pendientes' => $pendientes,
+            'nota' => $disponible
+                ? ($pendientes === 0 ? 'Sin operaciones pendientes' : 'Operaciones esperando reproceso')
+                : 'No disponible',
+            'redpanda_estado' => $disponible
+                ? 'Operativo'
+                : (is_string($resiliencia['redpanda']['estado'] ?? null)
+                    ? $resiliencia['redpanda']['estado']
+                    : 'No disponible'),
+            'consumidor_estado' => is_string($consumidor['estado'] ?? null)
+                ? $consumidor['estado']
+                : 'No disponible',
+            'consumidor_miembros' => is_int($consumidor['miembros'] ?? null) ? $consumidor['miembros'] : null,
+        ],
     ];
 }
 

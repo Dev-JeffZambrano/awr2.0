@@ -33,7 +33,10 @@
         'redpanda-nota',
         'servicio-redpanda-estado',
         'servicio-clickhouse-estado',
-        'rendimiento-clickhouse'
+        'rendimiento-clickhouse',
+        'facturas-pendientes-valor',
+        'facturas-pendientes-nota',
+        'facturas-pendientes-insignia'
     ];
 
     function milisegundos(valor) {
@@ -203,6 +206,23 @@
             escribir('tiempo-postgres', milisegundos(datos.tiempoPostgresMs));
             escribir('tiempo-api', milisegundos(datos.tiempoApiMs));
             escribir('tiempo-rtt', milisegundosDecimales(datos.latencia_red_ms));
+
+            var facturasPendientes = datos.facturasPendientes || {};
+
+            if (facturasPendientes.disponible === true && typeof facturasPendientes.valor === 'string') {
+                escribir('facturas-pendientes-valor', facturasPendientes.valor);
+                escribir(
+                    'facturas-pendientes-nota',
+                    typeof facturasPendientes.nota === 'string'
+                        ? facturasPendientes.nota
+                        : 'Operaciones esperando reproceso'
+                );
+                escribir('facturas-pendientes-insignia', 'Resiliencia');
+            } else {
+                escribir('facturas-pendientes-valor', 'No disponible');
+                escribir('facturas-pendientes-nota', 'No disponible');
+                escribir('facturas-pendientes-insignia', 'Resiliencia');
+            }
         }).catch(function () {
             marcarNoDisponible();
         });

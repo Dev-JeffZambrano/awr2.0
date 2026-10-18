@@ -149,8 +149,8 @@
         texto('tickets-nota', '');
         texto('total-cobrado', 'Total cobrado hoy: ' + (datos.totalCobrado || '$ 0,00'));
         texto('senal-sincronizacion', datos.sincronizacion || 'Pendiente');
-        texto('modo-resiliente', datos.modoResiliente || 'Pendiente de integración');
-        texto('operaciones-pendientes', 'Operaciones pendientes: ' + (datos.operacionesPendientes || 'Pendiente'));
+        texto('modo-resiliente', datos.modoResiliente || 'No disponible');
+        pintarOperacionesPendientes(datos.operacionesPendientes);
         dibujarHoras(Array.isArray(datos.serie) ? datos.serie : []);
 
         limpiar(cobros);
@@ -215,6 +215,36 @@
         }
     }
 
+    function pintarOperacionesPendientes(dato) {
+        var nodo = document.getElementById('operaciones-pendientes');
+        var valor = 'No disponible';
+        var cantidad = null;
+
+        if (dato && typeof dato === 'object') {
+            if (dato.disponible === true && typeof dato.valor === 'string' && /^\d+$/.test(dato.valor)) {
+                valor = dato.valor;
+                cantidad = Number(dato.valor);
+            } else if (typeof dato.valor === 'string' && dato.valor !== '') {
+                valor = dato.valor;
+            }
+        } else if (typeof dato === 'string' && /^\d+$/.test(dato)) {
+            valor = dato;
+            cantidad = Number(dato);
+        }
+
+        texto('operaciones-pendientes', 'Operaciones pendientes: ' + valor);
+
+        if (!nodo) {
+            return;
+        }
+
+        nodo.classList.remove('barra__nota--alerta');
+
+        if (cantidad !== null && cantidad > 0) {
+            nodo.classList.add('barra__nota--alerta');
+        }
+    }
+
     function marcarNoDisponible() {
         ['ventas-hoy', 'facturas-hoy', 'unidades-hoy', 'efectivo-hoy', 'stock-critico'].forEach(function (id) {
             texto(id, 'No disponible');
@@ -227,6 +257,7 @@
         texto('promedio-horario', 'No disponible');
         texto('tickets-emitidos', 'No disponible');
         texto('total-cobrado', 'Total cobrado hoy: No disponible');
+        pintarOperacionesPendientes({ disponible: false, valor: 'No disponible' });
         dibujarHoras([]);
         document.getElementById('grafico-vacio').textContent = 'No disponible';
     }

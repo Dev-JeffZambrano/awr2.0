@@ -205,11 +205,11 @@ $icono = static function (string $contenido): string {
                         </article>
                         <article class="tarjeta">
                             <div class="tarjeta__cabeza">
-                                <h3>Seguridad &amp; Cumplimiento</h3>
-                                <span class="insignia">Pendiente</span>
+                                <h3>Facturas Pendientes</h3>
+                                <span class="insignia" id="facturas-pendientes-insignia">Resiliencia</span>
                             </div>
-                            <p class="valor-pendiente">Pendiente</p>
-                            <p class="nota-pendiente">Sin indicador porcentual</p>
+                            <p class="valor-pendiente" id="facturas-pendientes-valor">…</p>
+                            <p class="nota-pendiente" id="facturas-pendientes-nota">Operaciones esperando reproceso</p>
                             <div class="huella" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                         </article>
                     </div>
@@ -330,6 +330,6 @@ $icono = static function (string $contenido): string {
     </div>
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/senalesAdministrador.js?v=2"></script>
-    <script src="public/js/dashboardAdministrador.js?v=8"></script>
+    <script src="public/js/dashboardAdministrador.js?v=9"></script>
 </body>
 </html>

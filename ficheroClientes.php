@@ -126,7 +126,7 @@ $icono = static function (string $contenido): string {
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>') ?>
                         <span>Modo Resiliente</span>
-                        <em>Pendiente de integración</em>
+                        <em id="modo-resiliente">…</em>
                     </button>
                 </nav>
             </details>
@@ -252,6 +252,7 @@ $icono = static function (string $contenido): string {
     </dialog>
 
     <script src="public/js/axios.min.js"></script>
+    <script src="public/js/senalesOperador.js?v=1"></script>
     <script src="public/js/ficheroClientes.js"></script>
 </body>
 </html>

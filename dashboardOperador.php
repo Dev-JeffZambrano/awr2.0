@@ -67,7 +67,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Operador | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardOperador.css?v=4">
+    <link rel="stylesheet" href="public/css/dashboardOperador.css?v=5">
 </head>
 <body>
     <div class="turno">
@@ -125,11 +125,11 @@ $icono = static function (string $contenido): string {
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>') ?>
                         <span>Modo Resiliente</span>
-                        <em id="modo-resiliente">Pendiente de integración</em>
+                        <em id="modo-resiliente">…</em>
                     </button>
                 </nav>
             </details>
-            <p class="barra__nota" id="operaciones-pendientes">Operaciones pendientes: Pendiente</p>
+            <p class="barra__nota" id="operaciones-pendientes">Operaciones pendientes: …</p>
         </aside>
 
         <div class="zona">
@@ -295,6 +295,6 @@ $icono = static function (string $contenido): string {
         </div>
     </dialog>
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/dashboardOperador.js?v=2"></script>
+    <script src="public/js/dashboardOperador.js?v=4"></script>
 </body>
 </html>

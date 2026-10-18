@@ -11,12 +11,18 @@ class VentaRechazada extends RuntimeException
 {
 }
 
+class VentaDegradada extends RuntimeException
+{
+}
+
 class VentaService
 {
     private const TIPO_FACTURA = '01';
     private const TIPO_OPERACION = 'FACTURA';
     private const TIPO_MOVIMIENTO = 'SALIDA_FACTURA';
     private const TOPIC_FACTURAS_CONFIRMADAS = 'awr.facturas.confirmadas';
+    private const TOPIC_FACTURAS_PENDIENTES = 'awr.facturas.pendientes';
+    private const TIMEOUT_VENTA_MS = 3000;
     private const CONSUMIDOR_FINAL = 'CONSUMIDOR_FINAL';
     private const LIMITE_BUSQUEDA = 15;
     private const LIMITE_LINEAS = 40;
@@ -172,207 +178,531 @@ class VentaService
         return $cotizacion;
     }
 
-    public static function confirmarVenta(int $idUsuario, array $entrada): array
-    {
+    public static function confirmarVenta(
+        int $idUsuario,
+        array $entrada,
+        bool $permitirCaminoResiliente = true
+    ): array {
         $uuid = self::uuid($entrada['id_operacion'] ?? null);
         $idCliente = self::entero($entrada['id_cliente'] ?? null, 'Cliente no disponible');
         $idMetodo = self::entero($entrada['id_metodo_pago'] ?? null, 'Método de pago no disponible');
         $idPunto = self::entero($entrada['id_punto_emision'] ?? null, 'Punto de emisión no disponible');
         $cantidades = self::consolidarProductos($entrada['productos'] ?? null);
+        $productosPendiente = self::productosParaPendiente($cantidades);
+        $entradaNormalizada = [
+            'id_operacion' => $uuid,
+            'id_cliente' => $idCliente,
+            'id_metodo_pago' => $idMetodo,
+            'id_punto_emision' => $idPunto,
+            'productos' => $productosPendiente,
+        ];
 
-        DB::beginTransaction();
+        if (getenv('AWR_VENTA_DIRECTA') !== '1') {
+            try {
+                return self::confirmarVentaConLimite(
+                    $idUsuario,
+                    $entradaNormalizada,
+                    $permitirCaminoResiliente,
+                    $productosPendiente
+                );
+            } catch (VentaDegradada $e) {
+                return self::responderCaminoResiliente(
+                    $e,
+                    $permitirCaminoResiliente,
+                    $uuid,
+                    $idUsuario,
+                    $idCliente,
+                    $idPunto,
+                    $idMetodo,
+                    $productosPendiente
+                );
+            }
+        }
 
         try {
-            $sucursal = self::sucursalAutorizada($idUsuario);
-            $idSucursal = (int) $sucursal->id_sucursal;
-            $punto = self::puntoAutorizado($idPunto, $idSucursal);
-            $tipo = self::tipoFactura();
-            $cliente = self::clienteActivo($idCliente);
-            $metodo = self::metodoActivo($idMetodo);
-            $existente = self::facturaDeOperacion($uuid);
+            self::aplicarTimeoutVenta();
+            DB::beginTransaction();
 
-            if ($existente !== null) {
-                self::exigirMismaOperacion($existente, $idUsuario, $idSucursal);
-                DB::commit();
-
-                return self::respuestaFactura($existente, true);
-            }
-
-            $secuencial = DB::selectOne(
-                'SELECT id_secuencial, ultimo_numero
-                 FROM secuencial_comprobante
-                 WHERE id_punto_emision = ?
-                   AND id_tipo_comprobante = ?
-                   AND estado IS TRUE
-                 FOR UPDATE',
-                [(int) $punto->id_punto_emision, (int) $tipo->id_tipo_comprobante]
-            );
-
-            if ($secuencial === null) {
-                throw new VentaRechazada('No disponible');
-            }
-
-            $numero = (int) $secuencial->ultimo_numero + 1;
-
-            if ($numero < 1 || $numero > 999999999) {
-                throw new VentaRechazada('No disponible');
-            }
-
-            $lineas = self::armarLineas($idSucursal, $cantidades, true);
-            self::exigirStock($lineas);
-            $totales = self::sumarLineas($lineas);
-            $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa);
-            $configuracion = self::configuracionEmpresa((int) $sucursal->id_empresa);
-            $comprobante = sprintf(
-                '%s-%s-%09d',
-                $sucursal->codigo_establecimiento,
-                $punto->codigo,
-                $numero
-            );
-
-            DB::table('operacion_idempotente')->insert([
-                'id_operacion' => $uuid,
-                'tipo_operacion' => self::TIPO_OPERACION,
-                'id_usuario' => $idUsuario,
-                'id_sucursal' => $idSucursal,
-            ]);
-
-            $idFactura = DB::table('factura')->insertGetId([
-                'id_operacion' => $uuid,
-                'id_empresa' => (int) $empresa->id_empresa,
-                'id_sucursal' => $idSucursal,
-                'id_punto_emision' => (int) $punto->id_punto_emision,
-                'id_tipo_comprobante' => (int) $tipo->id_tipo_comprobante,
-                'id_cliente' => (int) $cliente->id_cliente,
-                'id_usuario' => $idUsuario,
-                'secuencial' => $numero,
-                'numero_comprobante' => $comprobante,
-                'fecha_emision' => DB::raw('NOW()'),
-                'estado' => 'EMITIDA',
-                'subtotal' => $totales['subtotal'],
-                'descuento' => $totales['descuento'],
-                'valor_impuesto' => $totales['valorImpuesto'],
-                'total' => $totales['total'],
-                'ruc_empresa' => (string) $empresa->identificacion,
-                'razon_social_empresa' => (string) ($empresa->razon_social !== null && $empresa->razon_social !== ''
-                    ? $empresa->razon_social
-                    : $empresa->nombre),
-                'nombre_comercial_empresa' => $empresa->nombre_comercial,
-                'direccion_matriz' => $empresa->direccion,
-                'codigo_establecimiento' => (string) $sucursal->codigo_establecimiento,
-                'nombre_sucursal' => (string) $sucursal->nombre,
-                'direccion_sucursal' => $sucursal->direccion,
-                'codigo_punto_emision' => (string) $punto->codigo,
-                'codigo_tipo_comprobante' => (string) $tipo->codigo,
-                'moneda' => (string) $configuracion->moneda,
-                'ambiente' => (string) $configuracion->ambiente,
-                'tipo_emision' => (string) $configuracion->tipo_emision,
-                'tipo_identificacion_cliente' => (string) $cliente->tipo_identificacion,
-                'identificacion_cliente' => (string) $cliente->identificacion,
-                'razon_social_cliente' => (string) $cliente->razon_social,
-                'direccion_cliente' => $cliente->direccion,
-            ], 'id_factura');
-
-            foreach ($lineas as $linea) {
-                DB::table('factura_detalle')->insert([
-                    'id_factura' => $idFactura,
-                    'id_producto' => $linea['idProducto'],
-                    'codigo_producto' => $linea['codigo'],
-                    'nombre_producto' => $linea['nombre'],
-                    'nombre_categoria' => $linea['nombreCategoria'],
-                    'cantidad' => $linea['cantidad'],
-                    'precio_unitario' => $linea['precioUnitario'],
-                    'costo_unitario' => $linea['costoUnitario'],
-                    'descuento' => '0.00',
-                    'id_impuesto' => $linea['idImpuesto'],
-                    'codigo_impuesto' => $linea['codigoImpuesto'],
-                    'nombre_impuesto' => $linea['nombreImpuesto'],
-                    'porcentaje_impuesto' => $linea['porcentajeImpuesto'],
-                    'subtotal' => $linea['subtotal'],
-                    'valor_impuesto' => $linea['valorImpuesto'],
-                    'total_linea' => $linea['totalLinea'],
-                ]);
-            }
-
-            DB::table('pago')->insert([
-                'id_factura' => $idFactura,
-                'id_metodo_pago' => (int) $metodo->id_metodo_pago,
-                'monto' => $totales['total'],
-                'referencia' => null,
-            ]);
-
-            foreach ($lineas as $linea) {
-                $stockNuevo = $linea['stockActual'] - $linea['cantidad'];
-                $actualizadas = DB::update(
-                    'UPDATE inventario_sucursal
-                     SET stock_actual = ?, fecha_actualizacion = NOW()
-                     WHERE id_inventario = ? AND stock_actual = ?',
-                    [$stockNuevo, $linea['idInventario'], $linea['stockActual']]
-                );
-
-                if ($actualizadas !== 1) {
-                    throw new VentaRechazada('Stock insuficiente.');
-                }
-
-                DB::table('movimiento_inventario')->insert([
-                    'id_operacion' => $uuid,
-                    'id_sucursal' => $idSucursal,
-                    'id_producto' => $linea['idProducto'],
-                    'id_usuario' => $idUsuario,
-                    'id_factura' => $idFactura,
-                    'tipo_movimiento' => self::TIPO_MOVIMIENTO,
-                    'cantidad' => $linea['cantidad'],
-                    'stock_anterior' => $linea['stockActual'],
-                    'stock_nuevo' => $stockNuevo,
-                ]);
-            }
-
-            $avanzado = DB::update(
-                'UPDATE secuencial_comprobante
-                 SET ultimo_numero = ?, fecha_actualizacion = NOW()
-                 WHERE id_secuencial = ? AND ultimo_numero = ?',
-                [$numero, (int) $secuencial->id_secuencial, (int) $secuencial->ultimo_numero]
-            );
-
-            if ($avanzado !== 1) {
-                throw new VentaRechazada('No disponible');
-            }
-
-            DB::commit();
-
-            $creada = self::facturaDeOperacion($uuid);
-
-            if ($creada === null) {
-                throw new VentaRechazada('No disponible');
-            }
-
-            self::publicarFacturaConfirmadaEnAnalitica((int) $creada->id_factura);
-
-            return self::respuestaFactura($creada, false);
-        } catch (VentaRechazada $e) {
-            self::revertir();
-            throw $e;
-        } catch (QueryException $e) {
-            self::revertir();
-
-            if (self::esDuplicadoOperacion($e)) {
+            try {
+                $sucursal = self::sucursalAutorizada($idUsuario);
+                $idSucursal = (int) $sucursal->id_sucursal;
+                $punto = self::puntoAutorizado($idPunto, $idSucursal);
+                $tipo = self::tipoFactura();
+                $cliente = self::clienteActivo($idCliente);
+                $metodo = self::metodoActivo($idMetodo);
                 $existente = self::facturaDeOperacion($uuid);
 
                 if ($existente !== null) {
-                    $sucursal = self::sucursalAutorizada($idUsuario);
-                    self::exigirMismaOperacion($existente, $idUsuario, (int) $sucursal->id_sucursal);
+                    self::exigirMismaOperacion($existente, $idUsuario, $idSucursal);
+                    DB::commit();
+                    self::restablecerTimeoutVenta();
+                    self::publicarFacturaConfirmadaEnAnalitica((int) $existente->id_factura);
 
                     return self::respuestaFactura($existente, true);
                 }
+
+                $secuencial = DB::selectOne(
+                    'SELECT id_secuencial, ultimo_numero
+                     FROM secuencial_comprobante
+                     WHERE id_punto_emision = ?
+                       AND id_tipo_comprobante = ?
+                       AND estado IS TRUE
+                     FOR UPDATE',
+                    [(int) $punto->id_punto_emision, (int) $tipo->id_tipo_comprobante]
+                );
+
+                if ($secuencial === null) {
+                    throw new VentaRechazada('No disponible');
+                }
+
+                $numero = (int) $secuencial->ultimo_numero + 1;
+
+                if ($numero < 1 || $numero > 999999999) {
+                    throw new VentaRechazada('No disponible');
+                }
+
+                $lineas = self::armarLineas($idSucursal, $cantidades, true);
+                self::exigirStock($lineas);
+                $totales = self::sumarLineas($lineas);
+                $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa);
+                $configuracion = self::configuracionEmpresa((int) $sucursal->id_empresa);
+                $comprobante = sprintf(
+                    '%s-%s-%09d',
+                    $sucursal->codigo_establecimiento,
+                    $punto->codigo,
+                    $numero
+                );
+
+                DB::table('operacion_idempotente')->insert([
+                    'id_operacion' => $uuid,
+                    'tipo_operacion' => self::TIPO_OPERACION,
+                    'id_usuario' => $idUsuario,
+                    'id_sucursal' => $idSucursal,
+                ]);
+
+                $idFactura = DB::table('factura')->insertGetId([
+                    'id_operacion' => $uuid,
+                    'id_empresa' => (int) $empresa->id_empresa,
+                    'id_sucursal' => $idSucursal,
+                    'id_punto_emision' => (int) $punto->id_punto_emision,
+                    'id_tipo_comprobante' => (int) $tipo->id_tipo_comprobante,
+                    'id_cliente' => (int) $cliente->id_cliente,
+                    'id_usuario' => $idUsuario,
+                    'secuencial' => $numero,
+                    'numero_comprobante' => $comprobante,
+                    'fecha_emision' => DB::raw('NOW()'),
+                    'estado' => 'EMITIDA',
+                    'subtotal' => $totales['subtotal'],
+                    'descuento' => $totales['descuento'],
+                    'valor_impuesto' => $totales['valorImpuesto'],
+                    'total' => $totales['total'],
+                    'ruc_empresa' => (string) $empresa->identificacion,
+                    'razon_social_empresa' => (string) ($empresa->razon_social !== null && $empresa->razon_social !== ''
+                        ? $empresa->razon_social
+                        : $empresa->nombre),
+                    'nombre_comercial_empresa' => $empresa->nombre_comercial,
+                    'direccion_matriz' => $empresa->direccion,
+                    'codigo_establecimiento' => (string) $sucursal->codigo_establecimiento,
+                    'nombre_sucursal' => (string) $sucursal->nombre,
+                    'direccion_sucursal' => $sucursal->direccion,
+                    'codigo_punto_emision' => (string) $punto->codigo,
+                    'codigo_tipo_comprobante' => (string) $tipo->codigo,
+                    'moneda' => (string) $configuracion->moneda,
+                    'ambiente' => (string) $configuracion->ambiente,
+                    'tipo_emision' => (string) $configuracion->tipo_emision,
+                    'tipo_identificacion_cliente' => (string) $cliente->tipo_identificacion,
+                    'identificacion_cliente' => (string) $cliente->identificacion,
+                    'razon_social_cliente' => (string) $cliente->razon_social,
+                    'direccion_cliente' => $cliente->direccion,
+                ], 'id_factura');
+
+                foreach ($lineas as $linea) {
+                    DB::table('factura_detalle')->insert([
+                        'id_factura' => $idFactura,
+                        'id_producto' => $linea['idProducto'],
+                        'codigo_producto' => $linea['codigo'],
+                        'nombre_producto' => $linea['nombre'],
+                        'nombre_categoria' => $linea['nombreCategoria'],
+                        'cantidad' => $linea['cantidad'],
+                        'precio_unitario' => $linea['precioUnitario'],
+                        'costo_unitario' => $linea['costoUnitario'],
+                        'descuento' => '0.00',
+                        'id_impuesto' => $linea['idImpuesto'],
+                        'codigo_impuesto' => $linea['codigoImpuesto'],
+                        'nombre_impuesto' => $linea['nombreImpuesto'],
+                        'porcentaje_impuesto' => $linea['porcentajeImpuesto'],
+                        'subtotal' => $linea['subtotal'],
+                        'valor_impuesto' => $linea['valorImpuesto'],
+                        'total_linea' => $linea['totalLinea'],
+                    ]);
+                }
+
+                DB::table('pago')->insert([
+                    'id_factura' => $idFactura,
+                    'id_metodo_pago' => (int) $metodo->id_metodo_pago,
+                    'monto' => $totales['total'],
+                    'referencia' => null,
+                ]);
+
+                foreach ($lineas as $linea) {
+                    $stockNuevo = $linea['stockActual'] - $linea['cantidad'];
+                    $actualizadas = DB::update(
+                        'UPDATE inventario_sucursal
+                         SET stock_actual = ?, fecha_actualizacion = NOW()
+                         WHERE id_inventario = ? AND stock_actual = ?',
+                        [$stockNuevo, $linea['idInventario'], $linea['stockActual']]
+                    );
+
+                    if ($actualizadas !== 1) {
+                        throw new VentaRechazada('Stock insuficiente.');
+                    }
+
+                    DB::table('movimiento_inventario')->insert([
+                        'id_operacion' => $uuid,
+                        'id_sucursal' => $idSucursal,
+                        'id_producto' => $linea['idProducto'],
+                        'id_usuario' => $idUsuario,
+                        'id_factura' => $idFactura,
+                        'tipo_movimiento' => self::TIPO_MOVIMIENTO,
+                        'cantidad' => $linea['cantidad'],
+                        'stock_anterior' => $linea['stockActual'],
+                        'stock_nuevo' => $stockNuevo,
+                    ]);
+                }
+
+                $avanzado = DB::update(
+                    'UPDATE secuencial_comprobante
+                     SET ultimo_numero = ?, fecha_actualizacion = NOW()
+                     WHERE id_secuencial = ? AND ultimo_numero = ?',
+                    [$numero, (int) $secuencial->id_secuencial, (int) $secuencial->ultimo_numero]
+                );
+
+                if ($avanzado !== 1) {
+                    throw new VentaRechazada('No disponible');
+                }
+
+                DB::commit();
+            } catch (VentaRechazada $e) {
+                self::revertir();
+                self::restablecerTimeoutVenta();
+                throw $e;
+            } catch (QueryException $e) {
+                self::revertir();
+
+                if (self::esDuplicadoOperacion($e)) {
+                    try {
+                        $existente = self::facturaDeOperacion($uuid);
+
+                        if ($existente !== null) {
+                            $sucursal = self::sucursalAutorizada($idUsuario);
+                            self::exigirMismaOperacion($existente, $idUsuario, (int) $sucursal->id_sucursal);
+                            self::restablecerTimeoutVenta();
+                            self::publicarFacturaConfirmadaEnAnalitica((int) $existente->id_factura);
+
+                            return self::respuestaFactura($existente, true);
+                        }
+                    } catch (Throwable $recuperacion) {
+                        if (self::esDegradacionInfraestructura($recuperacion)) {
+                            throw new VentaDegradada($recuperacion->getMessage(), 0, $recuperacion);
+                        }
+                    }
+                }
+
+                if (self::esDegradacionInfraestructura($e)) {
+                    throw new VentaDegradada($e->getMessage(), 0, $e);
+                }
+
+                self::restablecerTimeoutVenta();
+                error_log('AWR confirmarVenta: ' . $e->getMessage());
+                throw new VentaRechazada('No disponible');
+            } catch (Throwable $e) {
+                self::revertir();
+
+                if (self::esDegradacionInfraestructura($e)) {
+                    throw new VentaDegradada($e->getMessage(), 0, $e);
+                }
+
+                self::restablecerTimeoutVenta();
+                error_log('AWR confirmarVenta: ' . $e->getMessage());
+                throw new VentaRechazada('No disponible');
+            }
+        } catch (VentaDegradada $e) {
+            return self::responderCaminoResiliente(
+                $e,
+                $permitirCaminoResiliente,
+                $uuid,
+                $idUsuario,
+                $idCliente,
+                $idPunto,
+                $idMetodo,
+                $productosPendiente
+            );
+        } catch (Throwable $e) {
+            if (!self::esDegradacionInfraestructura($e)) {
+                throw $e instanceof VentaRechazada ? $e : new VentaRechazada('No disponible');
             }
 
-            error_log('AWR confirmarVenta: ' . $e->getMessage());
-            throw new VentaRechazada('No disponible');
-        } catch (Throwable $e) {
-            self::revertir();
-            error_log('AWR confirmarVenta: ' . $e->getMessage());
+            return self::responderCaminoResiliente(
+                $e instanceof VentaDegradada ? $e : new VentaDegradada($e->getMessage(), 0, $e),
+                $permitirCaminoResiliente,
+                $uuid,
+                $idUsuario,
+                $idCliente,
+                $idPunto,
+                $idMetodo,
+                $productosPendiente
+            );
+        }
+
+        self::restablecerTimeoutVenta();
+
+        $creada = self::facturaDeOperacion($uuid);
+
+        if ($creada === null) {
             throw new VentaRechazada('No disponible');
         }
+
+        self::publicarFacturaConfirmadaEnAnalitica((int) $creada->id_factura);
+
+        return self::respuestaFactura($creada, false);
+    }
+
+    private static function responderCaminoResiliente(
+        VentaDegradada $e,
+        bool $permitirCaminoResiliente,
+        string $uuid,
+        int $idUsuario,
+        int $idCliente,
+        int $idPunto,
+        int $idMetodo,
+        array $productosPendiente
+    ): array {
+        self::abortarConexionVenta();
+        error_log('AWR confirmarVenta degradada: ' . $e->getMessage());
+
+        if (!$permitirCaminoResiliente) {
+            throw $e;
+        }
+
+        return self::registrarVentaPendiente(
+            $uuid,
+            $idUsuario,
+            $idCliente,
+            $idPunto,
+            $idMetodo,
+            $productosPendiente
+        );
+    }
+
+    private static function confirmarVentaConLimite(
+        int $idUsuario,
+        array $entradaNormalizada,
+        bool $permitirCaminoResiliente,
+        array $productosPendiente
+    ): array {
+        $uuid = (string) $entradaNormalizada['id_operacion'];
+        $script = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools'
+            . DIRECTORY_SEPARATOR . 'venta' . DIRECTORY_SEPARATOR . 'confirmarAislado.php';
+        $php = self::binarioPhpCli();
+
+        if (!is_file($script) || $php === '') {
+            throw new VentaRechazada('No disponible');
+        }
+
+        $descriptores = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proceso = @proc_open(
+            [$php, $script],
+            $descriptores,
+            $pipes,
+            dirname(__DIR__, 2),
+            null,
+            ['bypass_shell' => true]
+        );
+
+        if (!is_resource($proceso)) {
+            $comando = '"' . $php . '" "' . $script . '"';
+            $proceso = @proc_open($comando, $descriptores, $pipes, dirname(__DIR__, 2));
+        }
+
+        if (!is_resource($proceso)) {
+            throw new VentaDegradada('No se pudo iniciar la confirmación aislada');
+        }
+
+        fwrite($pipes[0], json_encode([
+            'id_usuario' => $idUsuario,
+            'entrada' => $entradaNormalizada,
+        ], JSON_UNESCAPED_UNICODE));
+        fclose($pipes[0]);
+
+        $limite = microtime(true) + (self::TIMEOUT_VENTA_MS / 1000);
+        $agotado = false;
+
+        while (true) {
+            $estado = proc_get_status($proceso);
+
+            if (!$estado['running']) {
+                break;
+            }
+
+            if (microtime(true) >= $limite) {
+                $agotado = true;
+                self::terminarProcesoVenta($proceso, $estado['pid'] ?? null);
+                break;
+            }
+
+            usleep(50000);
+        }
+
+        if ($agotado) {
+            try {
+                @fclose($pipes[1]);
+                @fclose($pipes[2]);
+            } catch (Throwable $e) {
+            }
+            try {
+                self::cerrarProcesoVenta($proceso);
+            } catch (Throwable $e) {
+            }
+
+            try {
+                return self::responderCaminoResiliente(
+                    new VentaDegradada('Tiempo de confirmación agotado'),
+                    $permitirCaminoResiliente,
+                    $uuid,
+                    $idUsuario,
+                    (int) $entradaNormalizada['id_cliente'],
+                    (int) $entradaNormalizada['id_punto_emision'],
+                    (int) $entradaNormalizada['id_metodo_pago'],
+                    $productosPendiente
+                );
+            } catch (VentaDegradada | VentaRechazada $e) {
+                throw $e;
+            } catch (Throwable $e) {
+                throw new VentaRechazada(
+                    'No se pudo registrar la operación. Intente nuevamente cuando el servicio se encuentre disponible.'
+                );
+            }
+        }
+
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+        $stdout = (string) @stream_get_contents($pipes[1]);
+        $stderr = (string) @stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $codigo = self::cerrarProcesoVenta($proceso);
+
+        if ($stderr !== '') {
+            error_log('AWR confirmarVenta aislada: ' . trim($stderr));
+        }
+
+        $respuesta = json_decode(trim($stdout), true);
+
+        if (!is_array($respuesta) || !isset($respuesta['tipo'])) {
+            throw new VentaDegradada('Confirmación aislada sin respuesta');
+        }
+
+        if ($respuesta['tipo'] === 'ok' && is_array($respuesta['datos'] ?? null)) {
+            return $respuesta['datos'];
+        }
+
+        if ($respuesta['tipo'] === 'rechazada') {
+            throw new VentaRechazada((string) ($respuesta['mensaje'] ?? 'No disponible'));
+        }
+
+        if ($respuesta['tipo'] === 'degradada' || $codigo === 2) {
+            return self::responderCaminoResiliente(
+                new VentaDegradada((string) ($respuesta['mensaje'] ?? 'PostgreSQL no disponible')),
+                $permitirCaminoResiliente,
+                $uuid,
+                $idUsuario,
+                (int) $entradaNormalizada['id_cliente'],
+                (int) $entradaNormalizada['id_punto_emision'],
+                (int) $entradaNormalizada['id_metodo_pago'],
+                $productosPendiente
+            );
+        }
+
+        throw new VentaRechazada('No disponible');
+    }
+
+    private static function terminarProcesoVenta($proceso, mixed $pid): void
+    {
+        if (is_int($pid) || (is_string($pid) && preg_match('/^[1-9][0-9]*$/', $pid) === 1)) {
+            if (stripos(PHP_OS, 'WIN') === 0) {
+                exec('taskkill /F /T /PID ' . (int) $pid . ' 2>NUL');
+            } else {
+                exec('kill -9 ' . (int) $pid . ' 2>/dev/null');
+            }
+        }
+
+        @proc_terminate($proceso, 9);
+    }
+
+    private static function cerrarProcesoVenta($proceso): int
+    {
+        for ($i = 0; $i < 20; $i++) {
+            $estado = @proc_get_status($proceso);
+
+            if (!is_array($estado)) {
+                return -1;
+            }
+
+            if ($estado['running'] !== true) {
+                $codigo = @proc_close($proceso);
+
+                return is_int($codigo) ? $codigo : -1;
+            }
+
+            if ($i === 0 || $i === 5 || $i === 10) {
+                self::terminarProcesoVenta($proceso, $estado['pid'] ?? null);
+            }
+
+            usleep(50000);
+        }
+
+        $estado = @proc_get_status($proceso);
+        if (is_array($estado) && ($estado['running'] ?? false) === true) {
+            self::terminarProcesoVenta($proceso, $estado['pid'] ?? null);
+        }
+
+        return -1;
+    }
+
+    private static function binarioPhpCli(): string
+    {
+        $binario = (string) PHP_BINARY;
+
+        if ($binario !== '' && preg_match('/php\.exe$/i', $binario) === 1 && is_file($binario)) {
+            return $binario;
+        }
+
+        $desdeEnv = trim((string) ($_ENV['AWR_PHP_CLI'] ?? getenv('AWR_PHP_CLI') ?: ''));
+
+        if ($desdeEnv !== '' && is_file($desdeEnv)) {
+            return $desdeEnv;
+        }
+
+        $preferido = 'C:\\wamp64\\bin\\php\\php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION . '\\php.exe';
+
+        if (is_file($preferido)) {
+            return $preferido;
+        }
+
+        $candidatos = glob('C:\\wamp64\\bin\\php\\php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.*\\php.exe') ?: [];
+        rsort($candidatos, SORT_NATURAL);
+
+        foreach ($candidatos as $candidato) {
+            if (is_file($candidato)) {
+                return $candidato;
+            }
+        }
+
+        return 'php';
     }
 
     private static function sucursalAutorizada(int $idUsuario): object
@@ -879,5 +1209,128 @@ class VentaService
         if (DB::transactionLevel() > 0) {
             DB::rollBack();
         }
+    }
+
+    private static function productosParaPendiente(array $cantidades): array
+    {
+        $productos = [];
+
+        foreach ($cantidades as $idProducto => $cantidad) {
+            $productos[] = [
+                'id_producto' => (int) $idProducto,
+                'cantidad' => (int) $cantidad,
+            ];
+        }
+
+        return $productos;
+    }
+
+    private static function registrarVentaPendiente(
+        string $uuid,
+        int $idUsuario,
+        int $idCliente,
+        int $idPunto,
+        int $idMetodo,
+        array $productos
+    ): array {
+        $mensaje = [
+            'id_operacion' => $uuid,
+            'tipo_operacion' => self::TIPO_OPERACION,
+            'id_usuario' => $idUsuario,
+            'id_cliente' => $idCliente,
+            'id_punto_emision' => $idPunto,
+            'id_metodo_pago' => $idMetodo,
+            'productos' => $productos,
+            'fecha_solicitud' => (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
+                ->format('Y-m-d\TH:i:s.v\Z'),
+        ];
+
+        try {
+            (new RedpandaService())->publicar(self::TOPIC_FACTURAS_PENDIENTES, $mensaje, $uuid);
+        } catch (Throwable $e) {
+            error_log('AWR confirmarVenta pendiente: ' . $e->getMessage());
+            throw new VentaRechazada(
+                'No se pudo registrar la operación. Intente nuevamente cuando el servicio se encuentre disponible.'
+            );
+        }
+
+        return [
+            'exito' => true,
+            'estado' => 'EN_PROCESO',
+            'mensaje' => 'La operación fue recibida y será procesada automáticamente cuando el servicio se encuentre disponible.',
+            'id_operacion' => $uuid,
+        ];
+    }
+
+    private static function aplicarTimeoutVenta(): void
+    {
+        DB::statement('SET statement_timeout TO ' . self::TIMEOUT_VENTA_MS);
+    }
+
+    private static function restablecerTimeoutVenta(): void
+    {
+        try {
+            DB::statement('SET statement_timeout TO 0');
+        } catch (Throwable $e) {
+            self::abortarConexionVenta();
+        }
+    }
+
+    private static function abortarConexionVenta(): void
+    {
+        try {
+            DB::connection()->disconnect();
+        } catch (Throwable $e) {
+        }
+    }
+
+    private static function esDegradacionInfraestructura(Throwable $e): bool
+    {
+        $estado = '';
+
+        if ($e instanceof QueryException) {
+            $estado = (string) ($e->errorInfo[0] ?? '');
+        } elseif (isset($e->errorInfo[0]) && is_string($e->errorInfo[0])) {
+            $estado = $e->errorInfo[0];
+        }
+
+        if (in_array($estado, [
+            '57014',
+            '08000',
+            '08001',
+            '08003',
+            '08004',
+            '08006',
+            '08007',
+            '57P01',
+            '57P02',
+            '57P03',
+            'HY000',
+        ], true)) {
+            return true;
+        }
+
+        $detalle = strtolower($e->getMessage());
+
+        foreach ([
+            'statement timeout',
+            'query_canceled',
+            'canceling statement',
+            'connection refused',
+            'could not connect',
+            'server closed the connection',
+            'broken pipe',
+            'timeout expired',
+            'connection timed out',
+            'no connection to the server',
+            'ssl connection has been closed',
+            'terminating connection',
+        ] as $fragmento) {
+            if (str_contains($detalle, $fragmento)) {
+                return true;
+            }
+        }
+
+        return $e instanceof VentaDegradada;
     }
 }

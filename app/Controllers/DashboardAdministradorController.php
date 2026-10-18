@@ -3,6 +3,7 @@
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
 use App\Models\Usuario;
+use App\Services\EstadoResilienciaService;
 use App\Services\EstadoSistemaService;
 use Illuminate\Database\Capsule\Manager as DB;
 
@@ -149,6 +150,7 @@ function obtenerResumenAdministrador(): void
         $roles = (int) DB::table('rol')->count();
 
         $estado = EstadoSistemaService::obtenerEstadoActual();
+        $resiliencia = EstadoResilienciaService::obtenerResumen();
         $motor = $estado['postgresql'];
         $aplicacion = is_array($estado['aplicacion'] ?? null) ? $estado['aplicacion'] : [];
         $versionPhp = is_string($aplicacion['version_php'] ?? null) ? $aplicacion['version_php'] : '';
@@ -198,6 +200,7 @@ function obtenerResumenAdministrador(): void
             'tiempoApiMs' => (int) round((hrtime(true) - $inicioApi) / 1000000),
             'redpanda' => proyectarRedpanda(is_array($estado['redpanda'] ?? null) ? $estado['redpanda'] : []),
             'clickhouse' => proyectarClickHouse(is_array($estado['clickhouse'] ?? null) ? $estado['clickhouse'] : []),
+            'facturasPendientes' => proyectarFacturasPendientes($resiliencia),
             'estado' => $estado,
         ]);
     } catch (Throwable $e) {
@@ -218,6 +221,40 @@ function proyectarRedpanda(array $redpanda): array
         'broker' => $operativo && is_string($redpanda['broker'] ?? null) ? $redpanda['broker'] : null,
         'puerto_kafka' => $operativo && is_int($redpanda['puerto_kafka'] ?? null) ? $redpanda['puerto_kafka'] : null,
         'puerto_admin' => $operativo && is_int($redpanda['puerto_admin'] ?? null) ? $redpanda['puerto_admin'] : null,
+    ];
+}
+
+function proyectarFacturasPendientes(array $resiliencia): array
+{
+    if (($resiliencia['disponible'] ?? false) !== true) {
+        return [
+            'disponible' => false,
+            'cantidad' => null,
+            'valor' => 'No disponible',
+            'nota' => 'No disponible',
+        ];
+    }
+
+    $cantidad = is_int($resiliencia['facturas_pendientes'] ?? null)
+        ? $resiliencia['facturas_pendientes']
+        : null;
+
+    if ($cantidad === null) {
+        return [
+            'disponible' => false,
+            'cantidad' => null,
+            'valor' => 'No disponible',
+            'nota' => 'No disponible',
+        ];
+    }
+
+    return [
+        'disponible' => true,
+        'cantidad' => $cantidad,
+        'valor' => (string) $cantidad,
+        'nota' => $cantidad === 0
+            ? 'Sin operaciones pendientes'
+            : 'Operaciones esperando reproceso',
     ];
 }
 

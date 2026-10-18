@@ -26,6 +26,7 @@
     var carrito = [];
     var cotizacion = null;
     var uuidVenta = null;
+    var enProceso = false;
     var confirmando = false;
     var reintento = false;
     var ultimoAgregado = 0;
@@ -131,7 +132,7 @@
     }
 
     function puedeConfirmar() {
-        return !confirmando && carrito.length > 0 && cliente && cliente.id > 0 && metodoId > 0 && puntoId > 0;
+        return !confirmando && !enProceso && carrito.length > 0 && cliente && cliente.id > 0 && metodoId > 0 && puntoId > 0;
     }
 
     function actualizarConfirmar() {
@@ -653,6 +654,7 @@
         carrito = [];
         cotizacion = null;
         uuidVenta = null;
+        enProceso = false;
         reintento = false;
         confirmando = false;
         ultimoAgregado = 0;
@@ -690,6 +692,8 @@
 
     function mostrarExito(datos) {
         var factura = datos.factura || {};
+        dialogo.classList.remove('exito--proceso');
+        texto('resultado-etiqueta', 'Comprobante');
         texto('resultado-titulo', datos.idempotente === true ? 'Venta confirmada correctamente' : 'Venta emitida correctamente');
         texto('resultado-numero', factura.numeroComprobante || '—');
         texto('resultado-total', dinero(factura.total));
@@ -703,6 +707,24 @@
             nota.textContent = '';
         }
         marcarEstado('Emitida');
+        if (!dialogo.open) {
+            dialogo.showModal();
+        }
+    }
+
+    function mostrarEnProceso(datos) {
+        enProceso = true;
+        dialogo.classList.add('exito--proceso');
+        texto('resultado-etiqueta', 'Operación');
+        texto('resultado-titulo', 'Venta en proceso');
+        texto('resultado-numero', datos.id_operacion || asegurarUuid());
+        texto('resultado-total', '—');
+        texto('resultado-estado', 'EN_PROCESO');
+        var nota = document.getElementById('resultado-nota');
+        nota.hidden = false;
+        nota.textContent = datos.mensaje
+            || 'La operación fue recibida y será procesada automáticamente cuando el servicio se encuentre disponible.';
+        marcarEstado('En proceso');
         if (!dialogo.open) {
             dialogo.showModal();
         }
@@ -741,6 +763,13 @@
             document.querySelectorAll('[data-volver]').forEach(function (enlace) {
                 enlace.setAttribute('aria-disabled', 'false');
             });
+            if (datos.exito === true && datos.estado === 'EN_PROCESO') {
+                mostrarAviso('');
+                mostrarEnProceso(datos);
+                actualizarConfirmar();
+                pintarCarrito();
+                return;
+            }
             if (datos.exito === true && datos.factura) {
                 mostrarAviso('');
                 mostrarExito(datos);

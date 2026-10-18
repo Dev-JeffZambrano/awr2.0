@@ -155,7 +155,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
         <h2 id="resultado-titulo">Venta emitida correctamente</h2>
         <p class="exito__nota" id="resultado-nota" hidden></p>
         <dl>
-            <div><dt>Comprobante</dt><dd id="resultado-numero"></dd></div>
+            <div><dt id="resultado-etiqueta">Comprobante</dt><dd id="resultado-numero"></dd></div>
             <div><dt>Total</dt><dd id="resultado-total"></dd></div>
             <div><dt>Estado</dt><dd id="resultado-estado"></dd></div>
         </dl>
@@ -166,6 +166,6 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
     </dialog>
 
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/puntoVenta.js?v=2"></script>
+    <script src="public/js/puntoVenta.js?v=3"></script>
 </body>
 </html>
