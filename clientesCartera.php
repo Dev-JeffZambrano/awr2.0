@@ -95,10 +95,10 @@ $icono = static function (string $contenido): string {
                     </button>
 
                     <p class="barra__grupo">Analítica</p>
-                    <button class="barra__item" type="button" disabled>
+                    <a class="barra__item" href="analiticaAdministrativo.php">
                         <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
                         <span>Analítica / Reportes BI</span>
-                    </button>
+                    </a>
                     <button class="barra__item" type="button" disabled>
                         <?= $icono('<path d="M4 16 9 11l3 3 8-8"/><path d="M15 6h5v5"/>') ?>
                         <span>Rentabilidad por Sucursal</span>

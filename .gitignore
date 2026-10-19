@@ -1,4 +1,5 @@
 .env
+tools/clickhouse/powerbi-reader.xml
 /vendor/
 /storage/logs/*
 *.log

@@ -1,0 +1,91 @@
+AWR — Guía rápida Power BI (defensa de tesis)
+==============================================
+Objetivo: 1 página profesional en ~15 minutos.
+Ya debes tener cargada: vw_ventas_analiticas (modo Importar).
+Al terminar guarda:
+  c:\wamp64\www\awr\documentacion\AWR_Analitica.pbix
+
+COLORES AWR (Formato → Tema o colores manuales)
+  Azul:   #1664F5
+  Cian:   #12B6C8
+  Texto:  #102033
+  Fondo:  #F5F8FC
+
+-------------------------------------------------------------------
+A) MEDIDAS (hazlas UNA vez)
+-------------------------------------------------------------------
+Inicio → Nueva medida  (repite por cada una)
+
+Ventas Totales = SUM(vw_ventas_analiticas[total_linea])
+
+Facturas = DISTINCTCOUNT(vw_ventas_analiticas[id_factura])
+
+Ticket Promedio = DIVIDE([Ventas Totales], [Facturas])
+
+Margen Bruto = SUM(vw_ventas_analiticas[margen])
+
+% Margen = DIVIDE([Margen Bruto], SUM(vw_ventas_analiticas[subtotal]))
+
+Unidades = SUM(vw_ventas_analiticas[cantidad])
+
+Formato:
+  Ventas Totales, Ticket Promedio, Margen Bruto → Moneda
+  % Margen → Porcentaje (1 decimal)
+
+-------------------------------------------------------------------
+B) PÁGINA 1 — “Resumen ejecutivo AWR”
+-------------------------------------------------------------------
+1. Renombra “Página 1” → Resumen ejecutivo
+
+2. Inserta 5 TARJETAS en la fila superior (de izquierda a derecha):
+   - Ventas Totales
+   - Facturas
+   - Ticket Promedio
+   - Margen Bruto
+   - % Margen
+
+3. Segmentación (slicer) a la izquierda:
+   - Campo: nombre_sucursal
+   - Otra: fecha_emision (entre)
+
+4. Gráfico de LÍNEAS (centro-arriba):
+   - Eje X: fecha_emision
+   - Valores: Ventas Totales
+   - Título: Evolución de ventas
+
+5. Gráfico de COLUMNAS (centro-abajo izq):
+   - Eje: nombre_sucursal
+   - Valores: Ventas Totales
+   - Título: Ventas por sucursal
+
+6. Barras horizontales (centro-abajo der):
+   - Eje: nombre_producto
+   - Valores: Ventas Totales
+   - Filtro visual → Top N → 10
+   - Título: Top 10 productos
+
+7. Donut (derecha):
+   - Leyenda: nombre_metodo_pago
+   - Valores: Ventas Totales
+   - Título: Mix de pago
+
+8. Cuadro de texto arriba:
+   “AWR · Analítica comercial · ClickHouse”
+
+-------------------------------------------------------------------
+C) GUARDAR (obligatorio para AWR)
+-------------------------------------------------------------------
+Archivo → Guardar como →
+  documentacion\AWR_Analitica.pbix
+
+Luego abre en el navegador:
+  analiticaAdministrativo.php
+→ el chip Archivo debe decir “Listo”.
+
+-------------------------------------------------------------------
+D) FRASE PARA EL JURADO (30 segundos)
+-------------------------------------------------------------------
+“Las ventas confirmadas en PostgreSQL se publican a Redpanda,
+ClickHouse materializa el modelo analítico en vw_ventas_analiticas,
+y Power BI Desktop consume esa vista en modo Importar.
+AWR no embebe el informe: orquesta el acceso al modelo BI oficial.”

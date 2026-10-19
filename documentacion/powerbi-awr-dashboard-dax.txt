@@ -1,0 +1,160 @@
+AWR — Medidas DAX para Power BI Desktop
+Fuente: vw_ventas_analiticas (ClickHouse, modo Importar)
+Guardar informe como: documentacion/AWR_Analitica.pbix
+
+================================================================
+1) EN POWER QUERY (Transformar datos) — recomendado
+================================================================
+- Confirmar tipos:
+  fecha_emision → Fecha/hora o Fecha
+  cantidad, precio_unitario, costo_unitario, descuento,
+  subtotal, valor_impuesto, total_linea, costo_total, margen → Decimal
+  anio, mes, dia → Entero
+  es_consumidor_final → Verdadero/Falso o Entero
+- Cerrar y aplicar.
+
+================================================================
+2) TABLA DE MEDIDAS (Modelado → Nueva tabla)
+================================================================
+Nombre de tabla: Medidas
+
+Crear estas medidas (una por una) en la tabla Medidas:
+
+---- Ventas e ingresos ----
+Ventas Totales =
+SUM ( vw_ventas_analiticas[total_linea] )
+
+Subtotal Neto =
+SUM ( vw_ventas_analiticas[subtotal] )
+
+Impuestos =
+SUM ( vw_ventas_analiticas[valor_impuesto] )
+
+Descuentos =
+SUM ( vw_ventas_analiticas[descuento] )
+
+---- Costos y margen ----
+Costo Total =
+SUM ( vw_ventas_analiticas[costo_total] )
+
+Margen Bruto =
+SUM ( vw_ventas_analiticas[margen] )
+
+% Margen =
+DIVIDE ( [Margen Bruto], [Subtotal Neto] )
+
+---- Volumen ----
+Unidades Vendidas =
+SUM ( vw_ventas_analiticas[cantidad] )
+
+Lineas de Venta =
+COUNTROWS ( vw_ventas_analiticas )
+
+Facturas =
+DISTINCTCOUNT ( vw_ventas_analiticas[id_factura] )
+
+Ticket Promedio =
+DIVIDE ( [Ventas Totales], [Facturas] )
+
+---- Clientes ----
+Clientes Distintos =
+DISTINCTCOUNT ( vw_ventas_analiticas[id_cliente] )
+
+% Consumidor Final =
+DIVIDE (
+    CALCULATE ( [Ventas Totales], vw_ventas_analiticas[es_consumidor_final] = 1 ),
+    [Ventas Totales]
+)
+
+---- Inteligencia de tiempo (requiere fecha_emision marcada como fecha) ----
+Ventas Mes Anterior =
+CALCULATE ( [Ventas Totales], DATEADD ( vw_ventas_analiticas[fecha_emision], -1, MONTH ) )
+
+Var Ventas vs Mes Ant =
+[Ventas Totales] - [Ventas Mes Anterior]
+
+% Var Ventas vs Mes Ant =
+DIVIDE ( [Var Ventas vs Mes Ant], [Ventas Mes Anterior] )
+
+================================================================
+3) LAYOUT DEL INFORME (3 páginas)
+================================================================
+
+PÁGINA 1 — Resumen ejecutivo
+----------------------------
+Filtros (slicers) arriba o a la izquierda:
+  - fecha_emision (entre)
+  - nombre_sucursal
+  - nombre_categoria
+  - nombre_metodo_pago
+
+Tarjetas (KPI) en fila:
+  1. Ventas Totales          formato moneda
+  2. Facturas                entero
+  3. Ticket Promedio         moneda
+  4. Margen Bruto            moneda
+  5. % Margen                porcentaje
+  6. % Var Ventas vs Mes Ant porcentaje (opcional)
+
+Visuales:
+  A. Línea: eje = fecha_emision (mes), valor = Ventas Totales
+     título: "Evolución de ventas"
+  B. Barras: eje = nombre_sucursal, valor = Ventas Totales
+     título: "Ventas por sucursal"
+  C. Barras horizontales: eje = nombre_producto, valor = Ventas Totales
+     Top N = 10 (filtro visual)
+     título: "Top 10 productos"
+  D. Donut: leyenda = nombre_metodo_pago, valor = Ventas Totales
+     título: "Mix de pago"
+
+PÁGINA 2 — Rentabilidad
+-----------------------
+Filtros: fecha_emision, nombre_sucursal, nombre_categoria
+
+Tarjetas:
+  Subtotal Neto | Costo Total | Margen Bruto | % Margen | Descuentos
+
+Visuales:
+  A. Barras apiladas o agrupadas:
+     eje = nombre_categoria
+     valores = Subtotal Neto, Costo Total, Margen Bruto
+  B. Tabla:
+     nombre_sucursal | Ventas Totales | Costo Total | Margen Bruto | % Margen
+  C. Dispersión (si hay volumen):
+     X = Unidades Vendidas, Y = % Margen, detalle = nombre_producto
+     (o barras: producto vs % Margen, Top 15)
+
+PÁGINA 3 — Operación comercial
+------------------------------
+Filtros: fecha_emision, nombre_sucursal
+
+Tarjetas:
+  Unidades Vendidas | Clientes Distintos | % Consumidor Final | Lineas de Venta
+
+Visuales:
+  A. Matriz:
+     filas = nombre_sucursal, columnas = mes (o anio/mes)
+     valores = Ventas Totales
+  B. Barras: razon_social_cliente vs Ventas Totales, Top 15
+  C. Tabla detalle (exportable):
+     fecha_emision | numero_comprobante | nombre_sucursal |
+     nombre_producto | cantidad | total_linea | margen
+
+================================================================
+4) FORMATO PROFESIONAL (rápido)
+================================================================
+- Tema: usar colores cercanos a AWR (#1664F5, #12B6C8, fondo claro)
+- Todas las medidas de dinero: $ #,##0.00
+- % con 1 decimal
+- Títulos claros, sin emojis
+- Desactivar “total” en donut si estorba
+- En Top N: mostrar elementos sin datos = desactivado
+
+================================================================
+5) GUARDAR Y ENLAZAR CON AWR
+================================================================
+Archivo → Guardar como →
+  c:\wamp64\www\awr\documentacion\AWR_Analitica.pbix
+
+Luego en AWR → Analítica / Reportes BI el chip Archivo pasa a "Listo"
+y aparece Descargar informe .pbix.
