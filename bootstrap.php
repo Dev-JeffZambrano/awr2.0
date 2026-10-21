@@ -8,17 +8,28 @@ $config = require __DIR__ . '/app/config/database.php';
 
 $capsule = new Capsule();
 
-$capsule->addConnection([
+$conexionBase = [
     'driver' => 'pgsql',
-    'host' => $config['host'],
-    'port' => $config['port'],
-    'database' => $config['database'],
-    'username' => $config['username'],
-    'password' => $config['password'],
     'charset' => 'utf8',
     'prefix' => '',
     'schema' => 'public',
-]);
+];
+
+$capsule->addConnection($conexionBase + [
+    'host' => $config['default']['host'],
+    'port' => $config['default']['port'],
+    'database' => $config['default']['database'],
+    'username' => $config['default']['username'],
+    'password' => $config['default']['password'],
+], 'default');
+
+$capsule->addConnection($conexionBase + [
+    'host' => $config['facturacion']['host'],
+    'port' => $config['facturacion']['port'],
+    'database' => $config['facturacion']['database'],
+    'username' => $config['facturacion']['username'],
+    'password' => $config['facturacion']['password'],
+], 'facturacion');
 
 $capsule->setAsGlobal();
 $capsule->bootEloquent();

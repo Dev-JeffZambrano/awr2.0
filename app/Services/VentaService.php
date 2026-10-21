@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Database\Capsule\Manager as DB;
+use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
 use RuntimeException;
 use Throwable;
@@ -26,6 +27,7 @@ class VentaService
     private const CONSUMIDOR_FINAL = 'CONSUMIDOR_FINAL';
     private const LIMITE_BUSQUEDA = 15;
     private const LIMITE_LINEAS = 40;
+    private const CONEXION_FACTURACION = 'facturacion';
 
     public static function obtenerDatosPos(int $idUsuario): array
     {
@@ -219,29 +221,31 @@ class VentaService
             }
         }
 
+        $db = self::dbFacturacion();
+
         try {
             self::aplicarTimeoutVenta();
-            DB::beginTransaction();
+            $db->beginTransaction();
 
             try {
-                $sucursal = self::sucursalAutorizada($idUsuario);
+                $sucursal = self::sucursalAutorizada($idUsuario, self::CONEXION_FACTURACION);
                 $idSucursal = (int) $sucursal->id_sucursal;
                 $punto = self::puntoAutorizado($idPunto, $idSucursal);
-                $tipo = self::tipoFactura();
+                $tipo = self::tipoFactura(self::CONEXION_FACTURACION);
                 $cliente = self::clienteActivo($idCliente);
                 $metodo = self::metodoActivo($idMetodo);
                 $existente = self::facturaDeOperacion($uuid);
 
                 if ($existente !== null) {
                     self::exigirMismaOperacion($existente, $idUsuario, $idSucursal);
-                    DB::commit();
+                    $db->commit();
                     self::restablecerTimeoutVenta();
                     self::publicarFacturaConfirmadaEnAnalitica((int) $existente->id_factura);
 
                     return self::respuestaFactura($existente, true);
                 }
 
-                $secuencial = DB::selectOne(
+                $secuencial = $db->selectOne(
                     'SELECT id_secuencial, ultimo_numero
                      FROM secuencial_comprobante
                      WHERE id_punto_emision = ?
@@ -261,10 +265,10 @@ class VentaService
                     throw new VentaRechazada('No disponible');
                 }
 
-                $lineas = self::armarLineas($idSucursal, $cantidades, true);
+                $lineas = self::armarLineas($idSucursal, $cantidades, true, self::CONEXION_FACTURACION);
                 self::exigirStock($lineas);
                 $totales = self::sumarLineas($lineas);
-                $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa);
+                $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa, self::CONEXION_FACTURACION);
                 $configuracion = self::configuracionEmpresa((int) $sucursal->id_empresa);
                 $comprobante = sprintf(
                     '%s-%s-%09d',
@@ -273,14 +277,14 @@ class VentaService
                     $numero
                 );
 
-                DB::table('operacion_idempotente')->insert([
+                $db->table('operacion_idempotente')->insert([
                     'id_operacion' => $uuid,
                     'tipo_operacion' => self::TIPO_OPERACION,
                     'id_usuario' => $idUsuario,
                     'id_sucursal' => $idSucursal,
                 ]);
 
-                $idFactura = DB::table('factura')->insertGetId([
+                $idFactura = $db->table('factura')->insertGetId([
                     'id_operacion' => $uuid,
                     'id_empresa' => (int) $empresa->id_empresa,
                     'id_sucursal' => $idSucursal,
@@ -317,7 +321,7 @@ class VentaService
                 ], 'id_factura');
 
                 foreach ($lineas as $linea) {
-                    DB::table('factura_detalle')->insert([
+                    $db->table('factura_detalle')->insert([
                         'id_factura' => $idFactura,
                         'id_producto' => $linea['idProducto'],
                         'codigo_producto' => $linea['codigo'],
@@ -337,7 +341,7 @@ class VentaService
                     ]);
                 }
 
-                DB::table('pago')->insert([
+                $db->table('pago')->insert([
                     'id_factura' => $idFactura,
                     'id_metodo_pago' => (int) $metodo->id_metodo_pago,
                     'monto' => $totales['total'],
@@ -346,7 +350,7 @@ class VentaService
 
                 foreach ($lineas as $linea) {
                     $stockNuevo = $linea['stockActual'] - $linea['cantidad'];
-                    $actualizadas = DB::update(
+                    $actualizadas = $db->update(
                         'UPDATE inventario_sucursal
                          SET stock_actual = ?, fecha_actualizacion = NOW()
                          WHERE id_inventario = ? AND stock_actual = ?',
@@ -357,7 +361,7 @@ class VentaService
                         throw new VentaRechazada('Stock insuficiente.');
                     }
 
-                    DB::table('movimiento_inventario')->insert([
+                    $db->table('movimiento_inventario')->insert([
                         'id_operacion' => $uuid,
                         'id_sucursal' => $idSucursal,
                         'id_producto' => $linea['idProducto'],
@@ -370,7 +374,7 @@ class VentaService
                     ]);
                 }
 
-                $avanzado = DB::update(
+                $avanzado = $db->update(
                     'UPDATE secuencial_comprobante
                      SET ultimo_numero = ?, fecha_actualizacion = NOW()
                      WHERE id_secuencial = ? AND ultimo_numero = ?',
@@ -381,7 +385,7 @@ class VentaService
                     throw new VentaRechazada('No disponible');
                 }
 
-                DB::commit();
+                $db->commit();
             } catch (VentaRechazada $e) {
                 self::revertir();
                 self::restablecerTimeoutVenta();
@@ -394,7 +398,7 @@ class VentaService
                         $existente = self::facturaDeOperacion($uuid);
 
                         if ($existente !== null) {
-                            $sucursal = self::sucursalAutorizada($idUsuario);
+                            $sucursal = self::sucursalAutorizada($idUsuario, self::CONEXION_FACTURACION);
                             self::exigirMismaOperacion($existente, $idUsuario, (int) $sucursal->id_sucursal);
                             self::restablecerTimeoutVenta();
                             self::publicarFacturaConfirmadaEnAnalitica((int) $existente->id_factura);
@@ -705,9 +709,14 @@ class VentaService
         return 'php';
     }
 
-    private static function sucursalAutorizada(int $idUsuario): object
+    private static function dbFacturacion(): Connection
     {
-        $filas = DB::select(
+        return DB::connection(self::CONEXION_FACTURACION);
+    }
+
+    private static function sucursalAutorizada(int $idUsuario, string $conexion = 'default'): object
+    {
+        $filas = DB::connection($conexion)->select(
             'SELECT s.id_sucursal, s.id_empresa, s.nombre, s.ciudad, s.direccion, s.codigo_establecimiento
              FROM usuario_sucursal us
              JOIN sucursal s ON s.id_sucursal = us.id_sucursal AND s.estado IS TRUE
@@ -722,9 +731,9 @@ class VentaService
         return $filas[0];
     }
 
-    private static function empresaDeSucursal(int $idEmpresa): object
+    private static function empresaDeSucursal(int $idEmpresa, string $conexion = 'default'): object
     {
-        $empresa = DB::selectOne(
+        $empresa = DB::connection($conexion)->selectOne(
             'SELECT id_empresa, nombre, razon_social, identificacion, nombre_comercial, direccion
              FROM empresa
              WHERE id_empresa = ? AND estado IS TRUE',
@@ -740,7 +749,7 @@ class VentaService
 
     private static function configuracionEmpresa(int $idEmpresa): object
     {
-        $configuracion = DB::selectOne(
+        $configuracion = self::dbFacturacion()->selectOne(
             'SELECT moneda, ambiente, tipo_emision
              FROM configuracion_facturacion
              WHERE id_empresa = ? AND estado IS TRUE',
@@ -767,7 +776,7 @@ class VentaService
 
     private static function puntoAutorizado(int $idPunto, int $idSucursal): object
     {
-        $punto = DB::selectOne(
+        $punto = self::dbFacturacion()->selectOne(
             'SELECT id_punto_emision, codigo, descripcion
              FROM punto_emision
              WHERE id_punto_emision = ? AND id_sucursal = ? AND estado IS TRUE',
@@ -781,9 +790,9 @@ class VentaService
         return $punto;
     }
 
-    private static function tipoFactura(): object
+    private static function tipoFactura(string $conexion = 'default'): object
     {
-        $tipo = DB::selectOne(
+        $tipo = DB::connection($conexion)->selectOne(
             'SELECT id_tipo_comprobante, codigo, nombre
              FROM tipo_comprobante
              WHERE codigo = ? AND estado IS TRUE',
@@ -816,7 +825,7 @@ class VentaService
 
     private static function clienteActivo(int $idCliente): object
     {
-        $cliente = DB::selectOne(
+        $cliente = self::dbFacturacion()->selectOne(
             'SELECT id_cliente, tipo_identificacion, identificacion, razon_social, direccion
              FROM cliente
              WHERE id_cliente = ? AND estado IS TRUE',
@@ -832,7 +841,7 @@ class VentaService
 
     private static function metodoActivo(int $idMetodo): object
     {
-        $metodo = DB::selectOne(
+        $metodo = self::dbFacturacion()->selectOne(
             'SELECT id_metodo_pago, codigo, nombre
              FROM metodo_pago
              WHERE id_metodo_pago = ? AND estado IS TRUE',
@@ -882,8 +891,12 @@ class VentaService
         return $cantidades;
     }
 
-    private static function armarLineas(int $idSucursal, array $cantidades, bool $bloquear): array
-    {
+    private static function armarLineas(
+        int $idSucursal,
+        array $cantidades,
+        bool $bloquear,
+        string $conexion = 'default'
+    ): array {
         $ids = array_keys($cantidades);
         $marcas = implode(',', array_fill(0, count($ids), '?'));
         $sql = 'SELECT inv.id_inventario, inv.id_producto, inv.stock_actual,
@@ -904,7 +917,7 @@ class VentaService
             $sql .= ' FOR UPDATE OF inv';
         }
 
-        $filas = DB::select($sql, array_merge([$idSucursal], $ids));
+        $filas = DB::connection($conexion)->select($sql, array_merge([$idSucursal], $ids));
         $porId = [];
 
         foreach ($filas as $fila) {
@@ -1007,14 +1020,15 @@ class VentaService
     private static function publicarFacturaConfirmadaEnAnalitica(int $idFactura): void
     {
         try {
-            $pagos = DB::select(
+            $db = self::dbFacturacion();
+            $pagos = $db->select(
                 'SELECT p.id_metodo_pago, mp.nombre AS nombre_metodo_pago
                  FROM pago p
                  JOIN metodo_pago mp ON mp.id_metodo_pago = p.id_metodo_pago
                  WHERE p.id_factura = ?',
                 [$idFactura]
             );
-            $lineas = DB::select(
+            $lineas = $db->select(
                 'SELECT d.id_factura_detalle, f.id_factura, f.id_operacion, f.fecha_emision,
                         f.numero_comprobante, f.id_sucursal, f.nombre_sucursal,
                         f.id_punto_emision, f.codigo_punto_emision, f.id_cliente,
@@ -1101,7 +1115,7 @@ class VentaService
 
     private static function facturaDeOperacion(string $uuid): ?object
     {
-        return DB::selectOne(
+        return self::dbFacturacion()->selectOne(
             'SELECT o.id_operacion, o.id_usuario, o.id_sucursal,
                     f.id_factura, f.numero_comprobante, f.secuencial, f.estado,
                     f.subtotal, f.descuento, f.valor_impuesto, f.total,
@@ -1206,8 +1220,10 @@ class VentaService
 
     private static function revertir(): void
     {
-        if (DB::transactionLevel() > 0) {
-            DB::rollBack();
+        $db = self::dbFacturacion();
+
+        if ($db->transactionLevel() > 0) {
+            $db->rollBack();
         }
     }
 
@@ -1264,13 +1280,13 @@ class VentaService
 
     private static function aplicarTimeoutVenta(): void
     {
-        DB::statement('SET statement_timeout TO ' . self::TIMEOUT_VENTA_MS);
+        self::dbFacturacion()->statement('SET statement_timeout TO ' . self::TIMEOUT_VENTA_MS);
     }
 
     private static function restablecerTimeoutVenta(): void
     {
         try {
-            DB::statement('SET statement_timeout TO 0');
+            self::dbFacturacion()->statement('SET statement_timeout TO 0');
         } catch (Throwable $e) {
             self::abortarConexionVenta();
         }
@@ -1279,7 +1295,7 @@ class VentaService
     private static function abortarConexionVenta(): void
     {
         try {
-            DB::connection()->disconnect();
+            self::dbFacturacion()->disconnect();
         } catch (Throwable $e) {
         }
     }
