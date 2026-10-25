@@ -168,9 +168,26 @@
     background: #fff4e8;
 }
 
+.exito {
+    margin: 0 0 0.75rem;
+    padding: 0.65rem 0.8rem;
+    color: #0c7a55;
+    font-weight: 600;
+    background: #e8f8f1;
+    border: 1px solid #b7e6d1;
+    border-radius: 0.7rem;
+}
+
+.acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
 .ver,
 .paginacion button,
-.detalle__cerrar {
+.detalle__cerrar,
+#nuevo-producto {
     height: 2rem;
     padding: 0 0.75rem;
     color: var(--color-primario);
@@ -183,17 +200,264 @@
 
 .ver:hover,
 .paginacion button:hover,
-.detalle__cerrar:hover {
+.detalle__cerrar:hover,
+#nuevo-producto:hover,
+.ver--primario {
     color: #ffffff;
     background: var(--color-primario);
     border-color: var(--color-primario);
 }
 
 .paginacion button:disabled,
-.ver:disabled {
+.ver:disabled,
+#nuevo-producto:disabled {
     color: var(--color-texto-suave);
     cursor: default;
     background: #f4f7fb;
+}
+
+.detalle__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    margin-top: 1rem;
+}
+
+.formulario__cuerpo {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    margin-top: 0.9rem;
+}
+
+.formulario__cuerpo label {
+    display: grid;
+    gap: 0.28rem;
+    color: var(--color-texto-suave);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.formulario__ancho,
+.formulario__iva {
+    grid-column: 1 / -1;
+}
+
+.formulario__cuerpo input,
+.formulario__cuerpo select,
+.formulario__cuerpo textarea {
+    width: 100%;
+    min-height: 2.4rem;
+    padding: 0.55rem 0.75rem;
+    color: var(--color-texto);
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: 0.7rem;
+}
+
+.formulario__cuerpo textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.formulario__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 2.4rem;
+    color: var(--color-texto);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.formulario__toggle input {
+    width: 1.05rem;
+    min-height: 1.05rem;
+}
+
+.formulario__sucursales {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.35rem;
+    padding: 0.85rem;
+    background: #ffffff;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.7rem;
+}
+
+.formulario__sucursales h3 {
+    margin: 0;
+    color: var(--color-texto);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.formulario__sucursales-ayuda {
+    margin: 0;
+    color: var(--color-texto-suave);
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.formulario__cuerpo .formulario__asignar {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    color: var(--color-texto);
+    font-size: 0.86rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.formulario__cuerpo .formulario__asignar input {
+    width: 1.05rem;
+    min-height: 1.05rem;
+    margin-top: 0.12rem;
+}
+
+.formulario__sucursales-campos {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.formulario__lista-sucursales {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 0.75rem;
+    max-height: 10rem;
+    overflow: auto;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.55rem;
+    background: var(--color-superficie);
+}
+
+.formulario__cuerpo .formulario__sucursal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    color: var(--color-texto);
+    font-size: 0.86rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.formulario__cuerpo .formulario__sucursal-item input {
+    width: 1rem;
+    min-height: 1rem;
+    margin-top: 0.12rem;
+}
+
+.formulario__stocks {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.formulario__cuerpo .formulario__stocks label {
+    display: grid;
+    gap: 0.28rem;
+}
+
+.formulario__asignadas {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.formulario__asignada {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.55rem;
+    background: var(--color-superficie);
+}
+
+.formulario__asignada-info {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.formulario__asignada-info strong {
+    color: var(--color-texto);
+    font-size: 0.88rem;
+    font-weight: 650;
+}
+
+.formulario__asignada-info span {
+    color: var(--color-texto-suave);
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.formulario__sucursales-vacio {
+    margin: 0;
+    color: var(--color-texto-suave);
+    font-size: 0.84rem;
+    font-weight: 500;
+}
+
+.formulario__agregar-sucursal {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.35rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-borde);
+}
+
+.formulario__agregar-sucursal h4 {
+    margin: 0;
+    color: var(--color-texto);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.formulario__agregar-aviso {
+    margin: 0;
+    color: #9b1c1c;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.formulario__agregar-campo {
+    display: grid;
+    gap: 0.28rem;
+    color: var(--color-texto);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.formulario__agregar-campo select {
+    width: 100%;
+    min-height: 2.4rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: var(--color-texto);
+    font: inherit;
 }
 
 .paginacion {
@@ -341,6 +605,82 @@
     font-weight: 600;
 }
 
+.presencia__acciones {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.alta-sucursal {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.85rem;
+    padding: 0.8rem;
+    background: #ffffff;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.7rem;
+}
+
+.alta-sucursal h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.alta-sucursal__aviso {
+    margin: 0;
+    padding: 0.5rem 0.65rem;
+    color: #8a3418;
+    font-size: 0.86rem;
+    background: #fff1eb;
+    border: 1px solid #f0c7b8;
+    border-radius: 0.55rem;
+}
+
+.alta-sucursal__campo,
+.alta-sucursal__stocks label {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.alta-sucursal__campo select,
+.alta-sucursal__stocks input {
+    width: 100%;
+    min-height: 2.35rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.55rem;
+    background: #fff;
+    font: inherit;
+}
+
+.alta-sucursal__todas {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+}
+
+.alta-sucursal__todas input {
+    margin-top: 0.15rem;
+}
+
+.alta-sucursal__stocks {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+@media (max-width: 720px) {
+    .alta-sucursal__stocks {
+        grid-template-columns: 1fr;
+    }
+}
+
 @keyframes espera {
     from {
         background-position: 100% 0;
@@ -360,8 +700,20 @@
 @media (max-width: 720px) {
     .paginacion,
     .detalle__datos,
-    .detalle__comercial {
+    .detalle__comercial,
+    .formulario__cuerpo,
+    .formulario__lista-sucursales,
+    .formulario__stocks {
         grid-template-columns: 1fr;
+    }
+
+    .formulario__asignada {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .formulario__asignada .ver {
+        width: 100%;
     }
 
     .paginacion {

@@ -47,7 +47,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Emitir factura | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/puntoVenta.css?v=2">
+    <link rel="stylesheet" href="public/css/puntoVenta.css?v=7">
 </head>
 <body>
     <main class="doc" role="dialog" aria-modal="true" aria-labelledby="titulo-emision">
@@ -133,13 +133,54 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
             <section class="panel" aria-labelledby="titulo-pago">
                 <h2 id="titulo-pago">Forma de pago</h2>
                 <div class="opciones opciones--pago" id="metodos-pago" role="radiogroup" aria-label="Método de pago"></div>
+                <p class="pago-validacion" id="pago-transferencia-resumen" hidden></p>
             </section>
             <section class="panel panel--resumen" aria-labelledby="titulo-resumen">
                 <h2 id="titulo-resumen">Resumen</h2>
                 <dl class="totales">
-                    <div><dt>Subtotal</dt><dd id="total-subtotal">—</dd></div>
-                    <div><dt>Impuestos</dt><dd id="total-impuesto">—</dd></div>
-                    <div><dt>Descuento</dt><dd id="total-descuento">—</dd></div>
+                    <div>
+                        <dt>Subtotal</dt>
+                        <dd id="total-subtotal">—</dd>
+                    </div>
+                    <div>
+                        <dt>IVA</dt>
+                        <dd id="total-impuesto">—</dd>
+                    </div>
+                    <div class="totales__descuento">
+                        <dt>
+                            <label for="descuento-opcion">Descuento</label>
+                        </dt>
+                        <dd>
+                            <div class="descuento-fila">
+                                <select id="descuento-opcion" name="descuento_opcion" title="Descuento sobre el subtotal" aria-describedby="ayuda-descuento">
+                                    <option value="0" selected>0%</option>
+                                    <option value="10">10%</option>
+                                    <option value="20">20%</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                                <div class="descuento-otro" id="descuento-otro-caja" hidden>
+                                    <label class="solo-lectura" for="descuento-otro">Porcentaje de descuento</label>
+                                    <input
+                                        id="descuento-otro"
+                                        name="descuento_otro"
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        inputmode="decimal"
+                                        placeholder="%"
+                                        title="Porcentaje sobre el subtotal"
+                                        aria-describedby="ayuda-descuento"
+                                        disabled
+                                    >
+                                    <span class="descuento-otro__sufijo" aria-hidden="true">%</span>
+                                </div>
+                                <span class="descuento-monto" id="total-descuento">—</span>
+                            </div>
+                            <p class="solo-lectura" id="ayuda-descuento">El descuento se aplica sobre el subtotal.</p>
+                            <p class="descuento-aviso" id="descuento-aviso" hidden>Ingrese un porcentaje entre 0 y 100.</p>
+                        </dd>
+                    </div>
                 </dl>
                 <p class="pagar"><span>Total</span><strong id="total-pagar">—</strong></p>
             </section>
@@ -165,7 +206,39 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
         </div>
     </dialog>
 
+    <dialog class="exito cuentas-transferencia" id="cuentas-transferencia" aria-labelledby="titulo-cuentas-transferencia">
+        <h2 id="titulo-cuentas-transferencia">Cuentas para transferencia</h2>
+        <p class="exito__nota">Elija la cuenta a la que realizó o realizará la transferencia.</p>
+        <ul class="cuentas-transferencia__lista" id="lista-cuentas-transferencia"></ul>
+        <div class="exito__acciones">
+            <button type="button" id="cerrar-cuentas-transferencia">Cerrar</button>
+        </div>
+    </dialog>
+
+    <dialog class="exito validar-transferencia" id="validar-transferencia" aria-labelledby="titulo-validar-transferencia">
+        <h2 id="titulo-validar-transferencia">Validar transferencia</h2>
+        <p class="exito__nota">Confirme la cuenta y registre el número de comprobante.</p>
+        <dl class="validar-transferencia__resumen" id="resumen-cuenta-transferencia"></dl>
+        <form id="form-validar-transferencia">
+            <label for="comprobante-transferencia">Número de comprobante</label>
+            <input
+                id="comprobante-transferencia"
+                name="comprobante_transferencia"
+                type="text"
+                maxlength="50"
+                required
+                autocomplete="off"
+                placeholder="Ej. COMP-12345"
+            >
+            <p class="validar-transferencia__aviso" id="aviso-comprobante-transferencia" hidden>Ingrese el número de comprobante.</p>
+            <div class="exito__acciones validar-transferencia__acciones">
+                <button type="button" id="cancelar-validar-transferencia">Cancelar</button>
+                <button type="submit" id="confirmar-validar-transferencia">Confirmar pago</button>
+            </div>
+        </form>
+    </dialog>
+
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/puntoVenta.js?v=3"></script>
+    <script src="public/js/puntoVenta.js?v=7"></script>
 </body>
 </html>

@@ -120,7 +120,10 @@ function procesarMensajePendiente(?string $crudo): string
         'id_cliente' => $datos['id_cliente'] ?? null,
         'id_punto_emision' => $datos['id_punto_emision'] ?? null,
         'id_metodo_pago' => $datos['id_metodo_pago'] ?? null,
+        'porcentaje_descuento' => $datos['porcentaje_descuento'] ?? 0,
         'productos' => $datos['productos'] ?? null,
+        'referencia_pago' => $datos['referencia_pago'] ?? null,
+        'transferencia' => $datos['transferencia'] ?? null,
     ];
 
     try {

@@ -18,10 +18,65 @@
     var metodosCaja = document.getElementById('metodos-pago');
     var confirmar = document.getElementById('confirmar-venta');
     var dialogo = document.getElementById('resultado-venta');
+    var dialogoTransferencia = document.getElementById('cuentas-transferencia');
+    var listaCuentasTransferencia = document.getElementById('lista-cuentas-transferencia');
+    var cerrarCuentasTransferencia = document.getElementById('cerrar-cuentas-transferencia');
+    var dialogoValidarTransferencia = document.getElementById('validar-transferencia');
+    var resumenCuentaTransferencia = document.getElementById('resumen-cuenta-transferencia');
+    var formValidarTransferencia = document.getElementById('form-validar-transferencia');
+    var inputComprobanteTransferencia = document.getElementById('comprobante-transferencia');
+    var avisoComprobanteTransferencia = document.getElementById('aviso-comprobante-transferencia');
+    var cancelarValidarTransferencia = document.getElementById('cancelar-validar-transferencia');
+    var pagoTransferenciaResumen = document.getElementById('pago-transferencia-resumen');
     var nuevaVenta = document.getElementById('nueva-venta');
+    var cuentasTransferencia = [
+        {
+            banco: 'Banco Pichincha',
+            tipo: 'Ahorros',
+            numero: '2204517893',
+            titular: 'Comercial AWR S.A.',
+            identificacion: '1792564839001'
+        },
+        {
+            banco: 'Banco Guayaquil',
+            tipo: 'Corriente',
+            numero: '0034589127',
+            titular: 'Comercial AWR S.A.',
+            identificacion: '1792564839001'
+        },
+        {
+            banco: 'Produbanco',
+            tipo: 'Ahorros',
+            numero: '1209876543',
+            titular: 'Comercial AWR S.A.',
+            identificacion: '1792564839001'
+        },
+        {
+            banco: 'Banco del Pacífico',
+            tipo: 'Corriente',
+            numero: '7456123098',
+            titular: 'Comercial AWR S.A.',
+            identificacion: '1792564839001'
+        },
+        {
+            banco: 'Banco Bolivariano',
+            tipo: 'Ahorros',
+            numero: '0987654321',
+            titular: 'Comercial AWR S.A.',
+            identificacion: '1792564839001'
+        }
+    ];
+    var descuentoOpcion = document.getElementById('descuento-opcion');
+    var descuentoOtroCaja = document.getElementById('descuento-otro-caja');
+    var descuentoOtro = document.getElementById('descuento-otro');
+    var ayudaDescuento = document.getElementById('ayuda-descuento');
+    var descuentoAviso = document.getElementById('descuento-aviso');
     var contexto = null;
     var cliente = null;
     var metodoId = 0;
+    var metodoEsTransferencia = false;
+    var transferenciaValidada = null;
+    var cuentaTransferenciaPendiente = null;
     var puntoId = 0;
     var carrito = [];
     var cotizacion = null;
@@ -98,6 +153,100 @@
         return String(valor).replace(/\.?0+$/, '') + '%';
     }
 
+    function redondearDinero(valor) {
+        return (Math.round((Number(valor) + Number.EPSILON) * 100) / 100).toFixed(2);
+    }
+
+    function sincronizarDescuentoOtro() {
+        var esOtro = descuentoOpcion && descuentoOpcion.value === 'otro';
+        if (!descuentoOtroCaja || !descuentoOtro) {
+            return;
+        }
+        descuentoOtroCaja.hidden = !esOtro;
+        descuentoOtro.disabled = !esOtro || confirmando;
+        if (!esOtro) {
+            descuentoOtro.value = '';
+            descuentoOtro.setCustomValidity('');
+        }
+        if (descuentoOpcion) {
+            descuentoOpcion.disabled = confirmando;
+        }
+    }
+
+    function porcentajeDescuentoActual() {
+        if (!descuentoOpcion) {
+            return { valido: true, porcentaje: 0 };
+        }
+        var opcion = descuentoOpcion.value;
+        if (opcion === '10' || opcion === '20' || opcion === '0') {
+            return { valido: true, porcentaje: Number(opcion) };
+        }
+        if (opcion === 'otro') {
+            var crudo = descuentoOtro ? String(descuentoOtro.value).trim() : '';
+            if (crudo === '') {
+                if (descuentoOtro) {
+                    descuentoOtro.setCustomValidity('Ingrese un porcentaje entre 0 y 100.');
+                }
+                return { valido: false, porcentaje: 0 };
+            }
+            var numero = Number(crudo);
+            if (!Number.isFinite(numero) || numero < 0 || numero > 100) {
+                if (descuentoOtro) {
+                    descuentoOtro.setCustomValidity('El descuento debe estar entre 0 y 100.');
+                }
+                return { valido: false, porcentaje: 0 };
+            }
+            if (descuentoOtro) {
+                descuentoOtro.setCustomValidity('');
+            }
+            return { valido: true, porcentaje: numero };
+        }
+        return { valido: true, porcentaje: 0 };
+    }
+
+    /**
+     * Descuento sobre subtotal (sin IVA).
+     * IVA proporcional al impuesto cotizado por línea:
+     * iva = ivaOriginal * (base / subtotal), equivalente a repartir el %
+     * sobre cada línea y recalcular su impuesto.
+     */
+    function totalesConDescuento() {
+        if (!cotizacion) {
+            return null;
+        }
+        var descuentoInfo = porcentajeDescuentoActual();
+        var subtotal = Number(cotizacion.subtotal);
+        var ivaOriginal = Number(cotizacion.valorImpuesto);
+        if (!Number.isFinite(subtotal) || !Number.isFinite(ivaOriginal)) {
+            return null;
+        }
+        if (!descuentoInfo.valido) {
+            return {
+                subtotal: redondearDinero(subtotal),
+                descuento: null,
+                valorImpuesto: null,
+                total: null,
+                porcentajeDescuento: null,
+                descuentoValido: false
+            };
+        }
+        var porcentajeDesc = descuentoInfo.porcentaje;
+        var descuento = Number(redondearDinero(subtotal * porcentajeDesc / 100));
+        var base = Number(redondearDinero(subtotal - descuento));
+        var iva = subtotal > 0
+            ? Number(redondearDinero(ivaOriginal * (base / subtotal)))
+            : 0;
+        var total = Number(redondearDinero(base + iva));
+        return {
+            subtotal: redondearDinero(subtotal),
+            descuento: redondearDinero(descuento),
+            valorImpuesto: redondearDinero(iva),
+            total: redondearDinero(total),
+            porcentajeDescuento: porcentajeDesc,
+            descuentoValido: true
+        };
+    }
+
     function post(cuerpo) {
         return axios.post(controlador, cuerpo, { timeout: 25000 });
     }
@@ -132,7 +281,19 @@
     }
 
     function puedeConfirmar() {
-        return !confirmando && !enProceso && carrito.length > 0 && cliente && cliente.id > 0 && metodoId > 0 && puntoId > 0;
+        var descuentoInfo = porcentajeDescuentoActual();
+        var transferenciaOk = !metodoEsTransferencia
+            || (transferenciaValidada
+                && String(transferenciaValidada.comprobante || '').trim() !== '');
+        return !confirmando
+            && !enProceso
+            && carrito.length > 0
+            && cliente
+            && cliente.id > 0
+            && metodoId > 0
+            && puntoId > 0
+            && descuentoInfo.valido
+            && transferenciaOk;
     }
 
     function actualizarConfirmar() {
@@ -150,11 +311,42 @@
         texto('cuenta-carrito', unidades + (unidades === 1 ? ' ítem' : ' ítems'));
     }
 
+    function mostrarAvisoDescuento(visible) {
+        if (descuentoAviso) {
+            descuentoAviso.hidden = !visible;
+        }
+        if (ayudaDescuento) {
+            ayudaDescuento.textContent = visible
+                ? 'Ingrese un porcentaje entre 0 y 100.'
+                : 'El descuento se aplica sobre el subtotal.';
+        }
+    }
+
     function pintarTotales() {
-        texto('total-subtotal', cotizacion ? dinero(cotizacion.subtotal) : '—');
-        texto('total-impuesto', cotizacion ? dinero(cotizacion.valorImpuesto) : '—');
-        texto('total-descuento', cotizacion ? dinero(cotizacion.descuento) : '—');
-        texto('total-pagar', cotizacion ? dinero(cotizacion.total) : '—');
+        var totales = totalesConDescuento();
+        sincronizarDescuentoOtro();
+        if (!totales) {
+            texto('total-subtotal', '—');
+            texto('total-impuesto', '—');
+            texto('total-descuento', '—');
+            texto('total-pagar', '—');
+            mostrarAvisoDescuento(false);
+            return;
+        }
+        texto('total-subtotal', dinero(totales.subtotal));
+        if (!totales.descuentoValido) {
+            texto('total-impuesto', '—');
+            texto('total-descuento', '—');
+            texto('total-pagar', '—');
+            mostrarAvisoDescuento(true);
+            actualizarConfirmar();
+            return;
+        }
+        texto('total-impuesto', dinero(totales.valorImpuesto));
+        texto('total-descuento', dinero(totales.descuento));
+        texto('total-pagar', dinero(totales.total));
+        mostrarAvisoDescuento(false);
+        actualizarConfirmar();
     }
 
     function lineaCotizada(idProducto) {
@@ -603,10 +795,190 @@
         });
     }
 
+    function esTransferencia(metodo) {
+        var codigo = String(metodo.codigo || '').toUpperCase();
+        var nombre = String(metodo.nombre || '').toLowerCase();
+        return codigo === 'TRANSFERENCIA' || nombre.indexOf('transferencia') !== -1;
+    }
+
+    function limpiarTransferenciaValidada() {
+        transferenciaValidada = null;
+        cuentaTransferenciaPendiente = null;
+        if (inputComprobanteTransferencia) {
+            inputComprobanteTransferencia.value = '';
+        }
+        if (avisoComprobanteTransferencia) {
+            avisoComprobanteTransferencia.hidden = true;
+        }
+        mostrarResumenTransferencia();
+    }
+
+    function mostrarResumenTransferencia() {
+        if (!pagoTransferenciaResumen) {
+            return;
+        }
+        if (!metodoEsTransferencia) {
+            pagoTransferenciaResumen.hidden = true;
+            pagoTransferenciaResumen.textContent = '';
+            pagoTransferenciaResumen.classList.remove('pago-validacion--pendiente');
+            return;
+        }
+        pagoTransferenciaResumen.hidden = false;
+        if (transferenciaValidada) {
+            pagoTransferenciaResumen.classList.remove('pago-validacion--pendiente');
+            pagoTransferenciaResumen.textContent = 'Transferencia validada: '
+                + transferenciaValidada.banco
+                + ' · comprobante '
+                + transferenciaValidada.comprobante;
+            return;
+        }
+        pagoTransferenciaResumen.classList.add('pago-validacion--pendiente');
+        pagoTransferenciaResumen.textContent = 'Elija una cuenta e ingrese el número de comprobante para validar el pago.';
+    }
+
+    function pintarFilasCuenta(contenedor, pares) {
+        limpiar(contenedor);
+        pares.forEach(function (par) {
+            var fila = document.createElement('div');
+            var dt = document.createElement('dt');
+            var dd = document.createElement('dd');
+            dt.textContent = par[0];
+            dd.textContent = par[1];
+            fila.appendChild(dt);
+            fila.appendChild(dd);
+            contenedor.appendChild(fila);
+        });
+    }
+
+    function pintarCuentasTransferencia() {
+        if (!listaCuentasTransferencia) {
+            return;
+        }
+        if (listaCuentasTransferencia.childElementCount > 0) {
+            return;
+        }
+        cuentasTransferencia.forEach(function (cuenta, indice) {
+            var item = document.createElement('li');
+            var boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'cuentas-transferencia__item';
+            boton.setAttribute('data-indice', String(indice));
+            boton.setAttribute('aria-label', 'Elegir cuenta ' + cuenta.banco);
+
+            var banco = document.createElement('p');
+            banco.className = 'cuentas-transferencia__banco';
+            banco.textContent = cuenta.banco;
+            boton.appendChild(banco);
+
+            var datos = document.createElement('dl');
+            pintarFilasCuenta(datos, [
+                ['Tipo', cuenta.tipo],
+                ['Número', cuenta.numero],
+                ['Titular', cuenta.titular],
+                ['RUC', cuenta.identificacion]
+            ]);
+            boton.appendChild(datos);
+            boton.addEventListener('click', function () {
+                abrirValidarTransferencia(cuenta);
+            });
+            item.appendChild(boton);
+            listaCuentasTransferencia.appendChild(item);
+        });
+    }
+
+    function mostrarCuentasTransferencia() {
+        if (!dialogoTransferencia) {
+            return;
+        }
+        pintarCuentasTransferencia();
+        if (!dialogoTransferencia.open) {
+            dialogoTransferencia.showModal();
+        }
+    }
+
+    function cerrarDialogoTransferencia() {
+        if (dialogoTransferencia && dialogoTransferencia.open) {
+            dialogoTransferencia.close();
+        }
+    }
+
+    function cerrarDialogoValidarTransferencia() {
+        if (dialogoValidarTransferencia && dialogoValidarTransferencia.open) {
+            dialogoValidarTransferencia.close();
+        }
+    }
+
+    function abrirValidarTransferencia(cuenta) {
+        if (!dialogoValidarTransferencia || !resumenCuentaTransferencia) {
+            return;
+        }
+        cuentaTransferenciaPendiente = cuenta;
+        pintarFilasCuenta(resumenCuentaTransferencia, [
+            ['Banco', cuenta.banco],
+            ['Tipo', cuenta.tipo],
+            ['Número', cuenta.numero],
+            ['Titular', cuenta.titular]
+        ]);
+        if (inputComprobanteTransferencia) {
+            inputComprobanteTransferencia.value = transferenciaValidada
+                && transferenciaValidada.numero === cuenta.numero
+                ? String(transferenciaValidada.comprobante || '')
+                : '';
+            inputComprobanteTransferencia.setCustomValidity('');
+        }
+        if (avisoComprobanteTransferencia) {
+            avisoComprobanteTransferencia.hidden = true;
+        }
+        if (!dialogoValidarTransferencia.open) {
+            dialogoValidarTransferencia.showModal();
+        }
+        if (inputComprobanteTransferencia) {
+            window.setTimeout(function () {
+                inputComprobanteTransferencia.focus();
+                inputComprobanteTransferencia.select();
+            }, 0);
+        }
+    }
+
+    function confirmarValidacionTransferencia() {
+        if (!cuentaTransferenciaPendiente || !inputComprobanteTransferencia) {
+            return false;
+        }
+        var comprobante = String(inputComprobanteTransferencia.value || '').trim();
+        if (comprobante === '') {
+            if (avisoComprobanteTransferencia) {
+                avisoComprobanteTransferencia.hidden = false;
+            }
+            inputComprobanteTransferencia.focus();
+            return false;
+        }
+        if (avisoComprobanteTransferencia) {
+            avisoComprobanteTransferencia.hidden = true;
+        }
+        transferenciaValidada = {
+            banco: cuentaTransferenciaPendiente.banco,
+            tipo: cuentaTransferenciaPendiente.tipo,
+            numero: cuentaTransferenciaPendiente.numero,
+            titular: cuentaTransferenciaPendiente.titular,
+            comprobante: comprobante.slice(0, 50)
+        };
+        cuentaTransferenciaPendiente = null;
+        cerrarDialogoValidarTransferencia();
+        cerrarDialogoTransferencia();
+        mostrarResumenTransferencia();
+        actualizarConfirmar();
+        return true;
+    }
+
     function llenarMetodos() {
         limpiar(metodosCaja);
         metodoId = 0;
-        (contexto.metodosPago || []).forEach(function (metodo) {
+        metodoEsTransferencia = false;
+        limpiarTransferenciaValidada();
+        var metodos = (contexto.metodosPago || []).filter(function (metodo) {
+            return String(metodo.codigo || '').toUpperCase() !== 'OTRO';
+        });
+        metodos.forEach(function (metodo) {
             var boton = document.createElement('button');
             boton.type = 'button';
             boton.className = 'opcion';
@@ -617,17 +989,31 @@
                 if (confirmando) {
                     return;
                 }
+                var eraTransferencia = metodoEsTransferencia;
+                var ahoraTransferencia = esTransferencia(metodo);
                 metodoId = metodo.id;
+                metodoEsTransferencia = ahoraTransferencia;
                 metodosCaja.querySelectorAll('button').forEach(function (item) {
                     var activo = item === boton;
                     item.classList.toggle('opcion--activa', activo);
                     item.setAttribute('aria-checked', activo ? 'true' : 'false');
                 });
+                if (!ahoraTransferencia) {
+                    limpiarTransferenciaValidada();
+                    cerrarDialogoValidarTransferencia();
+                    cerrarDialogoTransferencia();
+                } else {
+                    if (!eraTransferencia) {
+                        limpiarTransferenciaValidada();
+                    }
+                    mostrarResumenTransferencia();
+                    mostrarCuentasTransferencia();
+                }
                 actualizarConfirmar();
             });
             metodosCaja.appendChild(boton);
         });
-        if ((contexto.metodosPago || []).length === 1) {
+        if (metodos.length === 1) {
             metodosCaja.querySelector('button').click();
         }
     }
@@ -662,6 +1048,18 @@
         buscarCliente.value = '';
         limpiar(resultadosClientes);
         cliente = contexto ? contexto.consumidorFinal : null;
+        metodoEsTransferencia = false;
+        limpiarTransferenciaValidada();
+        cerrarDialogoValidarTransferencia();
+        cerrarDialogoTransferencia();
+        if (descuentoOpcion) {
+            descuentoOpcion.value = '0';
+        }
+        if (descuentoOtro) {
+            descuentoOtro.value = '';
+            descuentoOtro.setCustomValidity('');
+        }
+        sincronizarDescuentoOtro();
         mostrarAviso('');
         confirmar.textContent = 'Emitir factura';
         document.querySelectorAll('[data-volver]').forEach(function (enlace) {
@@ -669,6 +1067,9 @@
         });
         if (dialogo.open) {
             dialogo.close();
+        }
+        if (contexto) {
+            llenarMetodos();
         }
         pintarProductos([]);
         pintarCarrito();
@@ -734,8 +1135,15 @@
         if (confirmando) {
             return;
         }
-        if (!puedeConfirmar()) {
-            mostrarAviso('Revise el carrito, el cliente, el método de pago y el punto de emisión.');
+        var totales = totalesConDescuento();
+        if (!puedeConfirmar() || !totales || !totales.descuentoValido) {
+            if (metodoEsTransferencia && !transferenciaValidada) {
+                mostrarAviso('Valide la transferencia: elija una cuenta e ingrese el número de comprobante.');
+            } else {
+                mostrarAviso(!totales || !totales.descuentoValido
+                    ? 'Revise el porcentaje de descuento (0 a 100).'
+                    : 'Revise el carrito, el cliente, el método de pago y el punto de emisión.');
+            }
             actualizarConfirmar();
             return;
         }
@@ -747,19 +1155,37 @@
         document.querySelectorAll('[data-volver]').forEach(function (enlace) {
             enlace.setAttribute('aria-disabled', 'true');
         });
+        sincronizarDescuentoOtro();
         pintarCarrito();
-        post({
+        var payload = {
             op: 'confirmarVenta',
             id_operacion: asegurarUuid(),
             id_cliente: cliente.id,
             id_metodo_pago: metodoId,
             id_punto_emision: puntoId,
+            porcentaje_descuento: totales.porcentajeDescuento,
             productos: carrito.map(function (item) {
                 return { id_producto: item.idProducto, cantidad: item.cantidad };
             })
-        }).then(function (respuesta) {
+        };
+        if (metodoEsTransferencia && transferenciaValidada) {
+            payload.transferencia = {
+                banco: transferenciaValidada.banco,
+                tipo: transferenciaValidada.tipo,
+                numero_cuenta: transferenciaValidada.numero,
+                titular: transferenciaValidada.titular,
+                comprobante: transferenciaValidada.comprobante
+            };
+            payload.referencia_pago = transferenciaValidada.banco
+                + ' | '
+                + transferenciaValidada.numero
+                + ' | '
+                + transferenciaValidada.comprobante;
+        }
+        post(payload).then(function (respuesta) {
             var datos = respuesta.data || {};
             confirmando = false;
+            sincronizarDescuentoOtro();
             document.querySelectorAll('[data-volver]').forEach(function (enlace) {
                 enlace.setAttribute('aria-disabled', 'false');
             });
@@ -782,6 +1208,7 @@
             actualizarConfirmar();
         }).catch(function (error) {
             confirmando = false;
+            sincronizarDescuentoOtro();
             document.querySelectorAll('[data-volver]').forEach(function (enlace) {
                 enlace.setAttribute('aria-disabled', 'false');
             });
@@ -828,14 +1255,78 @@
             elegirCliente(contexto.consumidorFinal);
         }
     });
+    if (descuentoOpcion) {
+        descuentoOpcion.addEventListener('change', function () {
+            sincronizarDescuentoOtro();
+            pintarTotales();
+            if (descuentoOpcion.value === 'otro' && descuentoOtro) {
+                descuentoOtro.focus();
+            }
+        });
+    }
+    if (descuentoOtro) {
+        descuentoOtro.addEventListener('input', function () {
+            pintarTotales();
+        });
+    }
+    sincronizarDescuentoOtro();
     confirmar.addEventListener('click', enviarVenta);
     nuevaVenta.addEventListener('click', reiniciarVenta);
+    if (cerrarCuentasTransferencia) {
+        cerrarCuentasTransferencia.addEventListener('click', function () {
+            cerrarDialogoTransferencia();
+        });
+    }
+    if (cancelarValidarTransferencia) {
+        cancelarValidarTransferencia.addEventListener('click', function () {
+            cuentaTransferenciaPendiente = null;
+            cerrarDialogoValidarTransferencia();
+        });
+    }
+    if (formValidarTransferencia) {
+        formValidarTransferencia.addEventListener('submit', function (evento) {
+            evento.preventDefault();
+            confirmarValidacionTransferencia();
+        });
+    }
+    if (inputComprobanteTransferencia) {
+        inputComprobanteTransferencia.addEventListener('input', function () {
+            if (avisoComprobanteTransferencia) {
+                avisoComprobanteTransferencia.hidden = String(inputComprobanteTransferencia.value || '').trim() !== '';
+            }
+        });
+    }
+    if (dialogoValidarTransferencia) {
+        dialogoValidarTransferencia.addEventListener('cancel', function (evento) {
+            evento.preventDefault();
+            cuentaTransferenciaPendiente = null;
+            cerrarDialogoValidarTransferencia();
+        });
+    }
+    if (dialogoTransferencia) {
+        dialogoTransferencia.addEventListener('cancel', function (evento) {
+            evento.preventDefault();
+            if (dialogoValidarTransferencia && dialogoValidarTransferencia.open) {
+                return;
+            }
+            cerrarDialogoTransferencia();
+        });
+    }
     dialogo.addEventListener('cancel', function (evento) {
         evento.preventDefault();
         volverAlDashboard();
     });
     document.addEventListener('keydown', function (evento) {
         if (evento.key !== 'Escape') {
+            return;
+        }
+        if (dialogoValidarTransferencia && dialogoValidarTransferencia.open) {
+            cuentaTransferenciaPendiente = null;
+            cerrarDialogoValidarTransferencia();
+            return;
+        }
+        if (dialogoTransferencia && dialogoTransferencia.open) {
+            cerrarDialogoTransferencia();
             return;
         }
         evento.preventDefault();

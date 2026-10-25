@@ -58,7 +58,7 @@ $icono = static function (string $contenido): string {
     <title>Catálogo &amp; Precios | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
     <link rel="stylesheet" href="public/css/dashboardAdministrativo.css?v=2">
-    <link rel="stylesheet" href="public/css/catalogoPreciosAdministrativo.css?v=1">
+    <link rel="stylesheet" href="public/css/catalogoPreciosAdministrativo.css?v=4">
 </head>
 <body>
     <div class="comercial">
@@ -132,7 +132,7 @@ $icono = static function (string $contenido): string {
                     <div>
                         <p class="migas">Operación comercial</p>
                         <h1>Catálogo &amp; Precios</h1>
-                        <p class="bajada">Consulta global de productos, precios y cobertura comercial por sucursal.</p>
+                        <p class="bajada">Consulta y mantenimiento de productos, precios e IVA del catálogo comercial.</p>
                         <a class="volver" href="dashboardAdministrativo.php">← Volver al Dashboard</a>
                     </div>
                 </header>
@@ -190,12 +190,15 @@ $icono = static function (string $contenido): string {
                     </label>
                 </div>
 
+                <p class="exito" id="exito-catalogo" role="status" hidden></p>
+
                 <section class="panel" aria-labelledby="titulo-catalogo">
                     <div class="panel__cabeza">
                         <div>
                             <h2 id="titulo-catalogo">Productos</h2>
-                            <p>Consulta comercial de solo lectura.</p>
+                            <p>Maestro de productos, precios e IVA.</p>
                         </div>
+                        <button id="nuevo-producto" type="button">+ Nuevo producto</button>
                     </div>
                     <div class="marco">
                         <table class="listado">
@@ -272,11 +275,169 @@ $icono = static function (string $contenido): string {
                 <section aria-labelledby="detalle-presencia-titulo">
                     <h3 id="detalle-presencia-titulo">Disponibilidad por sucursal</h3>
                     <ul class="presencia" id="detalle-sucursales"></ul>
+                    <div class="alta-sucursal" id="alta-sucursal" hidden>
+                        <h4 id="alta-sucursal-titulo">Agregar a sucursales</h4>
+                        <p class="alta-sucursal__aviso" id="alta-sucursal-aviso" role="alert" hidden></p>
+                        <label class="alta-sucursal__campo" id="alta-sucursal-campo-select">Sucursal
+                            <select id="alta-sucursal-select">
+                                <option value="">Seleccione</option>
+                            </select>
+                        </label>
+                        <label class="alta-sucursal__todas">
+                            <input type="checkbox" id="alta-todas-sucursales">
+                            <span>Registrar en todas las sucursales activas no registradas</span>
+                        </label>
+                        <div class="alta-sucursal__stocks">
+                            <label>Stock actual
+                                <input type="number" id="alta-stock-actual" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock mínimo
+                                <input type="number" id="alta-stock-minimo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock máximo
+                                <input type="number" id="alta-stock-maximo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                        </div>
+                        <button class="ver" id="alta-sucursal-agregar" type="button">Agregar</button>
+                    </div>
                 </section>
+                <div class="detalle__acciones" id="detalle-acciones" hidden>
+                    <button class="ver" id="detalle-editar" type="button">Editar</button>
+                    <button class="ver" id="detalle-estado" type="button">Desactivar</button>
+                </div>
             </div>
         </div>
     </dialog>
+
+    <dialog class="detalle" id="formulario-producto" aria-labelledby="formulario-titulo">
+        <form class="detalle__hoja formulario" id="form-producto" novalidate>
+            <header class="detalle__tope">
+                <div>
+                    <p>Mantenimiento</p>
+                    <h2 id="formulario-titulo">Nuevo producto</h2>
+                </div>
+                <button class="detalle__cerrar" id="cerrar-formulario" type="button">Cerrar</button>
+            </header>
+            <p class="detalle__error" id="aviso-formulario" role="alert" hidden></p>
+            <p class="detalle__carga" id="carga-formulario" role="status" hidden>Cargando formulario...</p>
+            <div class="formulario__cuerpo" id="cuerpo-formulario">
+                <label>Código
+                    <input id="campo-codigo" type="text" maxlength="50" autocomplete="off" spellcheck="false" required>
+                </label>
+                <label>Código de barras
+                    <input id="campo-barras" type="text" maxlength="50" autocomplete="off" spellcheck="false">
+                </label>
+                <label class="formulario__ancho">Nombre
+                    <input id="campo-nombre" type="text" maxlength="200" autocomplete="off" required>
+                </label>
+                <label class="formulario__ancho">Descripción
+                    <textarea id="campo-descripcion" maxlength="500" rows="3"></textarea>
+                </label>
+                <label>Categoría
+                    <select id="campo-categoria" required>
+                        <option value="">Seleccione</option>
+                    </select>
+                </label>
+                <label>Proveedor
+                    <select id="campo-proveedor" required>
+                        <option value="">Seleccione</option>
+                    </select>
+                </label>
+                <label>Unidad de medida
+                    <input id="campo-unidad" type="text" maxlength="50" list="lista-unidades" autocomplete="off" required>
+                    <datalist id="lista-unidades"></datalist>
+                </label>
+                <label class="formulario__iva">IVA
+                    <span class="formulario__toggle">
+                        <input id="campo-aplica-iva" type="checkbox" checked>
+                        <span id="etiqueta-aplica-iva">Con IVA</span>
+                    </span>
+                </label>
+                <label>Precio
+                    <input id="campo-precio" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required>
+                </label>
+                <label>Costo
+                    <input id="campo-costo" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required>
+                </label>
+                <section class="formulario__sucursales" id="bloque-asignar-sucursales" aria-labelledby="titulo-asignar-sucursales" hidden>
+                    <h3 id="titulo-asignar-sucursales">Asignar a sucursales</h3>
+                    <p class="formulario__sucursales-ayuda">Opcional. Registra el inventario inicial en las sucursales elegidas al crear el producto.</p>
+                    <label class="formulario__asignar">
+                        <input type="checkbox" id="form-asignar-sucursales">
+                        <span>Asignar a sucursales al crear</span>
+                    </label>
+                    <div class="formulario__sucursales-campos" id="form-sucursales-campos" hidden>
+                        <label class="formulario__asignar">
+                            <input type="checkbox" id="form-todas-sucursales">
+                            <span>Todas las sucursales</span>
+                        </label>
+                        <div class="formulario__lista-sucursales" id="form-lista-sucursales" role="group" aria-label="Sucursales activas"></div>
+                        <div class="formulario__stocks">
+                            <label>Stock actual
+                                <input type="number" id="form-stock-actual" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock mínimo
+                                <input type="number" id="form-stock-minimo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock máximo
+                                <input type="number" id="form-stock-maximo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                        </div>
+                    </div>
+                </section>
+                <section class="formulario__sucursales" id="bloque-sucursales-asignadas" aria-labelledby="titulo-sucursales-asignadas" hidden>
+                    <h3 id="titulo-sucursales-asignadas">Sucursales asignadas</h3>
+                    <p class="formulario__sucursales-ayuda">Sucursales donde el producto tiene inventario activo. Al quitar, dejará de aparecer en el punto de venta de esa sucursal.</p>
+                    <ul class="formulario__asignadas" id="lista-sucursales-asignadas"></ul>
+                    <p class="formulario__sucursales-vacio" id="aviso-sin-sucursales-asignadas" hidden>No está asignado a ninguna sucursal.</p>
+                    <div class="formulario__agregar-sucursal" id="bloque-agregar-sucursal">
+                        <h4 id="titulo-agregar-sucursal">Agregar a otra sucursal</h4>
+                        <p class="formulario__sucursales-ayuda">Opcional. Registra o reactiva el producto en una sucursal pendiente.</p>
+                        <p class="formulario__agregar-aviso" id="aviso-agregar-sucursal" role="alert" hidden></p>
+                        <label class="formulario__agregar-campo" id="campo-agregar-sucursal-select">Sucursal
+                            <select id="form-agregar-sucursal-select">
+                                <option value="">Seleccione</option>
+                            </select>
+                        </label>
+                        <div class="formulario__stocks">
+                            <label>Stock actual
+                                <input type="number" id="form-agregar-stock-actual" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock mínimo
+                                <input type="number" id="form-agregar-stock-minimo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                            <label>Stock máximo
+                                <input type="number" id="form-agregar-stock-maximo" min="0" step="1" value="0" inputmode="numeric">
+                            </label>
+                        </div>
+                        <button class="ver" id="form-agregar-sucursal" type="button">Agregar</button>
+                    </div>
+                </section>
+            </div>
+            <div class="detalle__acciones">
+                <button class="ver ver--primario" id="guardar-producto" type="submit">Guardar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="detalle" id="confirma-producto" aria-labelledby="confirma-titulo">
+        <div class="detalle__hoja">
+            <header class="detalle__tope">
+                <div>
+                    <p>Confirmación</p>
+                    <h2 id="confirma-titulo">Confirmar</h2>
+                </div>
+                <button class="detalle__cerrar" id="cerrar-confirma" type="button">Cerrar</button>
+            </header>
+            <p id="texto-confirma"></p>
+            <div class="detalle__acciones" id="acciones-confirma">
+                <button class="ver" id="cancelar-confirma" type="button">Cancelar</button>
+                <button class="ver ver--primario" id="aceptar-confirma" type="button">Confirmar</button>
+            </div>
+        </div>
+    </dialog>
+
     <script src="public/js/axios.min.js"></script>
-    <script src="public/js/catalogoPreciosAdministrativo.js?v=1"></script>
+    <script src="public/js/catalogoPreciosAdministrativo.js?v=4"></script>
 </body>
 </html>

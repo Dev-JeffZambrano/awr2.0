@@ -39,6 +39,7 @@ class VentaService
             'SELECT id_metodo_pago, codigo, nombre
              FROM metodo_pago
              WHERE estado IS TRUE
+               AND codigo <> \'OTRO\'
              ORDER BY id_metodo_pago'
         );
         $tipo = self::tipoFactura();
@@ -169,12 +170,12 @@ class VentaService
         ];
     }
 
-    public static function cotizarVenta(int $idUsuario, array $productos): array
+    public static function cotizarVenta(int $idUsuario, array $productos, mixed $porcentajeDescuento = 0): array
     {
         $sucursal = self::sucursalAutorizada($idUsuario);
         $cantidades = self::consolidarProductos($productos);
         $lineas = self::armarLineas((int) $sucursal->id_sucursal, $cantidades, false);
-        $cotizacion = self::sumarLineas($lineas);
+        $cotizacion = self::sumarLineas($lineas, self::porcentajeDescuento($porcentajeDescuento));
         $cotizacion['exito'] = true;
 
         return $cotizacion;
@@ -189,6 +190,8 @@ class VentaService
         $idCliente = self::entero($entrada['id_cliente'] ?? null, 'Cliente no disponible');
         $idMetodo = self::entero($entrada['id_metodo_pago'] ?? null, 'Método de pago no disponible');
         $idPunto = self::entero($entrada['id_punto_emision'] ?? null, 'Punto de emisión no disponible');
+        $porcentajeDescuento = self::porcentajeDescuento($entrada['porcentaje_descuento'] ?? 0);
+        $referenciaPago = self::referenciaPago($entrada);
         $cantidades = self::consolidarProductos($entrada['productos'] ?? null);
         $productosPendiente = self::productosParaPendiente($cantidades);
         $entradaNormalizada = [
@@ -196,7 +199,9 @@ class VentaService
             'id_cliente' => $idCliente,
             'id_metodo_pago' => $idMetodo,
             'id_punto_emision' => $idPunto,
+            'porcentaje_descuento' => $porcentajeDescuento,
             'productos' => $productosPendiente,
+            'referencia_pago' => $referenciaPago,
         ];
 
         if (getenv('AWR_VENTA_DIRECTA') !== '1') {
@@ -216,7 +221,9 @@ class VentaService
                     $idCliente,
                     $idPunto,
                     $idMetodo,
-                    $productosPendiente
+                    $productosPendiente,
+                    $porcentajeDescuento,
+                    $referenciaPago
                 );
             }
         }
@@ -267,7 +274,7 @@ class VentaService
 
                 $lineas = self::armarLineas($idSucursal, $cantidades, true, self::CONEXION_FACTURACION);
                 self::exigirStock($lineas);
-                $totales = self::sumarLineas($lineas);
+                $totales = self::sumarLineas($lineas, $porcentajeDescuento);
                 $empresa = self::empresaDeSucursal((int) $sucursal->id_empresa, self::CONEXION_FACTURACION);
                 $configuracion = self::configuracionEmpresa((int) $sucursal->id_empresa);
                 $comprobante = sprintf(
@@ -345,7 +352,7 @@ class VentaService
                     'id_factura' => $idFactura,
                     'id_metodo_pago' => (int) $metodo->id_metodo_pago,
                     'monto' => $totales['total'],
-                    'referencia' => null,
+                    'referencia' => $referenciaPago,
                 ]);
 
                 foreach ($lineas as $linea) {
@@ -439,7 +446,9 @@ class VentaService
                 $idCliente,
                 $idPunto,
                 $idMetodo,
-                $productosPendiente
+                $productosPendiente,
+                $porcentajeDescuento,
+                $referenciaPago
             );
         } catch (Throwable $e) {
             if (!self::esDegradacionInfraestructura($e)) {
@@ -454,7 +463,9 @@ class VentaService
                 $idCliente,
                 $idPunto,
                 $idMetodo,
-                $productosPendiente
+                $productosPendiente,
+                $porcentajeDescuento,
+                $referenciaPago
             );
         }
 
@@ -479,7 +490,9 @@ class VentaService
         int $idCliente,
         int $idPunto,
         int $idMetodo,
-        array $productosPendiente
+        array $productosPendiente,
+        float $porcentajeDescuento = 0.0,
+        ?string $referenciaPago = null
     ): array {
         self::abortarConexionVenta();
         error_log('AWR confirmarVenta degradada: ' . $e->getMessage());
@@ -494,7 +507,9 @@ class VentaService
             $idCliente,
             $idPunto,
             $idMetodo,
-            $productosPendiente
+            $productosPendiente,
+            $porcentajeDescuento,
+            $referenciaPago
         );
     }
 
@@ -581,7 +596,9 @@ class VentaService
                     (int) $entradaNormalizada['id_cliente'],
                     (int) $entradaNormalizada['id_punto_emision'],
                     (int) $entradaNormalizada['id_metodo_pago'],
-                    $productosPendiente
+                    $productosPendiente,
+                    (float) ($entradaNormalizada['porcentaje_descuento'] ?? 0),
+                    self::referenciaOpcional($entradaNormalizada['referencia_pago'] ?? null)
                 );
             } catch (VentaDegradada | VentaRechazada $e) {
                 throw $e;
@@ -627,7 +644,9 @@ class VentaService
                 (int) $entradaNormalizada['id_cliente'],
                 (int) $entradaNormalizada['id_punto_emision'],
                 (int) $entradaNormalizada['id_metodo_pago'],
-                $productosPendiente
+                $productosPendiente,
+                (float) ($entradaNormalizada['porcentaje_descuento'] ?? 0),
+                self::referenciaOpcional($entradaNormalizada['referencia_pago'] ?? null)
             );
         }
 
@@ -978,18 +997,16 @@ class VentaService
         }
     }
 
-    private static function sumarLineas(array $lineas): array
+    private static function sumarLineas(array $lineas, float $porcentajeDescuento = 0.0): array
     {
         $subtotal = 0.0;
         $impuesto = 0.0;
-        $total = 0.0;
         $stockSuficiente = true;
         $visibles = [];
 
         foreach ($lineas as $linea) {
             $subtotal += (float) $linea['subtotal'];
             $impuesto += (float) $linea['valorImpuesto'];
-            $total += (float) $linea['totalLinea'];
             $stockSuficiente = $stockSuficiente && $linea['stockSuficiente'];
             $visibles[] = [
                 'idProducto' => $linea['idProducto'],
@@ -1007,12 +1024,24 @@ class VentaService
             ];
         }
 
+        $subtotalRedondeado = self::redondear($subtotal);
+        $impuestoOriginal = self::redondear($impuesto);
+        $descuento = self::redondear((float) $subtotalRedondeado * $porcentajeDescuento / 100);
+        $base = self::redondear((float) $subtotalRedondeado - (float) $descuento);
+        // IVA proporcional: equivale a repartir el % de descuento sobre cada
+        // subtotal de línea y recalcular impuesto = subtotal_linea * %IVA.
+        $valorImpuesto = (float) $subtotalRedondeado > 0
+            ? self::redondear((float) $impuestoOriginal * ((float) $base / (float) $subtotalRedondeado))
+            : '0.00';
+        $total = self::redondear((float) $base + (float) $valorImpuesto);
+
         return [
             'lineas' => $visibles,
-            'subtotal' => self::redondear($subtotal),
-            'descuento' => '0.00',
-            'valorImpuesto' => self::redondear($impuesto),
-            'total' => self::redondear($total),
+            'subtotal' => $subtotalRedondeado,
+            'descuento' => $descuento,
+            'valorImpuesto' => $valorImpuesto,
+            'total' => $total,
+            'porcentajeDescuento' => self::redondear($porcentajeDescuento),
             'stockSuficiente' => $stockSuficiente,
         ];
     }
@@ -1190,6 +1219,27 @@ class VentaService
         throw new VentaRechazada($mensaje);
     }
 
+    private static function porcentajeDescuento(mixed $valor): float
+    {
+        if ($valor === null || $valor === '') {
+            return 0.0;
+        }
+
+        if (is_int($valor) || is_float($valor)) {
+            $numero = (float) $valor;
+        } elseif (is_string($valor) && preg_match('/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/', $valor) === 1) {
+            $numero = (float) $valor;
+        } else {
+            throw new VentaRechazada('Descuento no válido.');
+        }
+
+        if ($numero < 0 || $numero > 100) {
+            throw new VentaRechazada('Descuento no válido.');
+        }
+
+        return round($numero, 2, PHP_ROUND_HALF_UP);
+    }
+
     private static function patron(string $texto): string
     {
         return '%' . str_replace(['|', '%', '_'], ['||', '|%', '|_'], $texto) . '%';
@@ -1241,13 +1291,79 @@ class VentaService
         return $productos;
     }
 
+    private static function referenciaOpcional(mixed $valor): ?string
+    {
+        if (!is_string($valor)) {
+            return null;
+        }
+
+        $texto = trim($valor);
+
+        if ($texto === '') {
+            return null;
+        }
+
+        return mb_substr($texto, 0, 100);
+    }
+
+    /**
+     * @param array<string,mixed> $entrada
+     */
+    private static function referenciaPago(array $entrada): ?string
+    {
+        $directa = self::referenciaOpcional($entrada['referencia_pago'] ?? null);
+
+        if ($directa !== null) {
+            return $directa;
+        }
+
+        $transferencia = $entrada['transferencia'] ?? null;
+
+        if (!is_array($transferencia)) {
+            return null;
+        }
+
+        $banco = trim((string) ($transferencia['banco'] ?? ''));
+        $numero = trim((string) ($transferencia['numero_cuenta'] ?? $transferencia['numero'] ?? ''));
+        $comprobante = trim((string) ($transferencia['comprobante'] ?? ''));
+
+        if ($banco === '' && $numero === '' && $comprobante === '') {
+            return null;
+        }
+
+        $bancoCorto = preg_replace('/^banco\s+(del\s+)?/iu', '', $banco) ?? $banco;
+        $bancoCorto = trim((string) $bancoCorto);
+
+        if ($bancoCorto === '') {
+            $bancoCorto = $banco;
+        }
+
+        $partesCompletas = array_values(array_filter([$bancoCorto, $numero, $comprobante], static function (string $parte): bool {
+            return $parte !== '';
+        }));
+        $completa = implode(' | ', $partesCompletas);
+
+        if (mb_strlen($completa) <= 100) {
+            return $completa === '' ? null : $completa;
+        }
+
+        $prioridad = array_values(array_filter([$comprobante, $bancoCorto, $numero], static function (string $parte): bool {
+            return $parte !== '';
+        }));
+        $recortada = implode(' | ', $prioridad);
+
+        return $recortada === '' ? null : mb_substr($recortada, 0, 100);
+    }
+
     private static function registrarVentaPendiente(
         string $uuid,
         int $idUsuario,
         int $idCliente,
         int $idPunto,
         int $idMetodo,
-        array $productos
+        array $productos,
+        float $porcentajeDescuento = 0.0,
+        ?string $referenciaPago = null
     ): array {
         $mensaje = [
             'id_operacion' => $uuid,
@@ -1256,7 +1372,9 @@ class VentaService
             'id_cliente' => $idCliente,
             'id_punto_emision' => $idPunto,
             'id_metodo_pago' => $idMetodo,
+            'porcentaje_descuento' => $porcentajeDescuento,
             'productos' => $productos,
+            'referencia_pago' => $referenciaPago,
             'fecha_solicitud' => (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))
                 ->format('Y-m-d\TH:i:s.v\Z'),
         ];
