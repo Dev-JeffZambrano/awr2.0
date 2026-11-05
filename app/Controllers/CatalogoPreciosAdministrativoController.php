@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
@@ -47,6 +48,8 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 if (!sesionAdministrativa()) {
     responder(403, [
         'exito' => false,
@@ -1242,7 +1245,7 @@ function sesionAdministrativa(): bool
         return false;
     }
 
-    session_start();
+    awr_iniciar_sesion();
     $id = $_SESSION['id_usuario'] ?? null;
 
     return ($_SESSION['rol'] ?? null) === 'Administrativo'

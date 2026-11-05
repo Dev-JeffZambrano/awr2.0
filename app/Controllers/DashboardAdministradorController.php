@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use App\Models\Usuario;
 use App\Services\EstadoResilienciaService;
 use App\Services\EstadoSistemaService;
@@ -48,6 +49,8 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 $op = $entrada['op'] ?? null;
 
 switch ($op) {
@@ -278,7 +281,7 @@ function exigirAdministrador(): void
     $sesionValida = false;
 
     if (isset($_COOKIE[session_name()])) {
-        session_start();
+        awr_iniciar_sesion();
         $sesionValida = isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
             && $_SESSION['rol'] === 'Administrador';
     }

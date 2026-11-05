@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use App\Models\Usuario;
 use Illuminate\Database\Capsule\Manager as DB;
 
@@ -46,6 +47,8 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 $op = $entrada['op'] ?? null;
 
 switch ($op) {
@@ -83,6 +86,13 @@ function iniciarSesion(array $entrada): void
         ]);
     }
 
+    if (!awr_login_permitido($username)) {
+        responder(429, [
+            'exito' => false,
+            'mensaje' => 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+        ]);
+    }
+
     try {
         $usuario = Usuario::query()->where('username', $username)->first();
 
@@ -93,6 +103,7 @@ function iniciarSesion(array $entrada): void
         $claveCorrecta = password_verify($password, $hash);
 
         if ($usuario === null || $usuario->estado !== true || $claveCorrecta !== true) {
+            awr_login_registrar_fallo($username);
             responder(200, [
                 'exito' => false,
                 'mensaje' => 'Usuario o contraseña incorrectos.',
@@ -147,7 +158,7 @@ function iniciarSesion(array $entrada): void
             $sucursal = $sucursales[0];
         }
 
-        session_start();
+        awr_iniciar_sesion();
         session_regenerate_id(true);
 
         $_SESSION = [
@@ -157,6 +168,7 @@ function iniciarSesion(array $entrada): void
             'apellidos' => (string) $usuario->apellidos,
             'id_rol' => (int) $rol->id_rol,
             'rol' => $nombreRol,
+            '_csrf' => bin2hex(random_bytes(32)),
         ];
 
         if ($sucursal !== null) {
@@ -164,6 +176,8 @@ function iniciarSesion(array $entrada): void
             $_SESSION['sucursal'] = (string) $sucursal->nombre;
             $_SESSION['ciudad'] = (string) $sucursal->ciudad;
         }
+
+        awr_login_limpiar($username);
 
         responder(200, [
             'exito' => true,
@@ -180,7 +194,7 @@ function iniciarSesion(array $entrada): void
 function cerrarSesion(): void
 {
     if (isset($_COOKIE[session_name()])) {
-        session_start();
+        awr_iniciar_sesion();
         $_SESSION = [];
 
         $params = session_get_cookie_params();

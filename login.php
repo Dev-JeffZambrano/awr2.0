@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/app/config/seguridad.php';
+
 $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 $directorio = str_replace('\\', '/', dirname($script));
 $rutaCookie = rtrim($directorio, '/');
@@ -13,6 +15,9 @@ session_set_cookie_params([
     'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
 ]);
 
+awr_iniciar_sesion();
+awr_csrf_token();
+
 $destinos = [
     'Administrador' => 'dashboardAdministrador.php',
     'Administrativo' => 'dashboardAdministrativo.php',
@@ -20,7 +25,6 @@ $destinos = [
 ];
 
 if (isset($_COOKIE[session_name()])) {
-    session_start();
     $rol = $_SESSION['rol'] ?? null;
     $sesionValida = isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
         && is_string($rol)
@@ -36,6 +40,7 @@ if (isset($_COOKIE[session_name()])) {
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <?php echo awr_csrf_meta(); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Iniciar sesión | AWR</title>
@@ -80,6 +85,7 @@ if (isset($_COOKIE[session_name()])) {
         </section>
     </main>
     <script src="public/js/axios.min.js"></script>
+    <script src="public/js/seguridad.js"></script>
     <script src="public/js/login.js"></script>
 </body>
 </html>

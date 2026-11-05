@@ -1,5 +1,12 @@
 <?php
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Solo CLI';
+    exit(1);
+}
+
 /**
  * Prepara ClickHouse para Power BI:
  * - VIEW vw_ventas_analiticas

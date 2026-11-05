@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use App\Services\EstadoSistemaService;
 use Illuminate\Database\Capsule\Manager as DB;
 
@@ -52,6 +53,8 @@ function atenderSolicitudBasesDatos(): void
         ]);
     }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
     $op = $entrada['op'] ?? null;
 
     switch ($op) {
@@ -842,7 +845,7 @@ function sesionAdministrador(): bool
         return false;
     }
 
-    session_start();
+    awr_iniciar_sesion();
 
     return isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
         && $_SESSION['rol'] === 'Administrador';

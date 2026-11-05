@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Query\Builder;
 
@@ -46,6 +47,8 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 $idUsuario = operadorEnSesion();
 
 if ($idUsuario < 1) {
@@ -312,7 +315,7 @@ function operadorEnSesion(): int
         return 0;
     }
 
-    session_start();
+    awr_iniciar_sesion();
     $rol = $_SESSION['rol'] ?? null;
     $id = $_SESSION['id_usuario'] ?? null;
 

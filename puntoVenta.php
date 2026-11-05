@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/app/config/seguridad.php';
+
 $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 $directorio = str_replace('\\', '/', dirname($script));
 $rutaCookie = rtrim($directorio, '/');
@@ -18,7 +20,7 @@ $rolEsperado = 'Operador';
 $sesionValida = false;
 
 if (isset($_COOKIE[session_name()])) {
-    session_start();
+    awr_iniciar_sesion();
     $sesionValida = isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])
         && $_SESSION['rol'] === $rolEsperado;
 }
@@ -27,6 +29,9 @@ if (!$sesionValida) {
     header('Location: ' . $login, true, 302);
     exit;
 }
+
+awr_csrf_token();
+
 
 $nombreCompleto = trim(
     ($_SESSION['nombres'] ?? '') . ' ' .
@@ -43,6 +48,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <?php echo awr_csrf_meta(); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Emitir factura | AWR</title>
@@ -239,6 +245,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
     </dialog>
 
     <script src="public/js/axios.min.js"></script>
+    <script src="public/js/seguridad.js"></script>
     <script src="public/js/puntoVenta.js?v=7"></script>
 </body>
 </html>

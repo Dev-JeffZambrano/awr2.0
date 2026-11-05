@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use App\Services\EstadoResilienciaService;
 use Illuminate\Database\Capsule\Manager as DB;
 
@@ -46,6 +47,8 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 switch ($entrada['op'] ?? null) {
     case 'obtenerResumenOperador':
         obtenerResumenOperador();
@@ -82,7 +85,7 @@ function obtenerResumenOperador(): void
     $idUsuario = 0;
 
     if (isset($_COOKIE[session_name()])) {
-        session_start();
+        awr_iniciar_sesion();
         $rol = $_SESSION['rol'] ?? null;
         $id = $_SESSION['id_usuario'] ?? null;
 
@@ -340,7 +343,7 @@ function exigirOperador(): int
 
     if (isset($_COOKIE[session_name()])) {
         if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
+            awr_iniciar_sesion();
         }
 
         $rol = $_SESSION['rol'] ?? null;

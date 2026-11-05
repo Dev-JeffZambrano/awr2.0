@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 
 $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 $directorio = str_replace('\\', '/', dirname($script, 3));
@@ -40,6 +41,8 @@ if (!is_array($entrada)) {
         'mensaje' => 'Datos incompletos.',
     ]);
 }
+
+awr_exigir_csrf($entrada);
 
 if (!sesionAdministrativaAnalitica()) {
     responderAnalitica(403, [
@@ -302,7 +305,7 @@ function formatearNumeroAnalitica(string $valor, bool $dinero): string
 function sesionAdministrativaAnalitica(): bool
 {
     if (session_status() !== PHP_SESSION_ACTIVE) {
-        session_start();
+        awr_iniciar_sesion();
     }
 
     return isset($_SESSION['id_usuario'], $_SESSION['username'], $_SESSION['id_rol'], $_SESSION['rol'])

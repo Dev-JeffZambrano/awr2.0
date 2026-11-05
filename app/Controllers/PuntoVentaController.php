@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
+require_once dirname(__DIR__, 2) . '/app/config/seguridad.php';
 use App\Services\VentaRechazada;
 use App\Services\VentaService;
 
@@ -46,10 +47,12 @@ if (!is_array($entrada)) {
     ]);
 }
 
+
+awr_exigir_csrf(is_array($entrada) ? $entrada : []);
 $idUsuario = 0;
 
 if (isset($_COOKIE[session_name()])) {
-    session_start();
+    awr_iniciar_sesion();
     $rol = $_SESSION['rol'] ?? null;
     $id = $_SESSION['id_usuario'] ?? null;
 

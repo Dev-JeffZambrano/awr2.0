@@ -1,0 +1,30 @@
+# AWR — denegar acceso HTTP a secretos, dependencias y herramientas CLI.
+<IfModule mod_authz_core.c>
+    <FilesMatch "(?i)^\.env">
+        Require all denied
+    </FilesMatch>
+    <FilesMatch "(?i)\.(env|log|sql|bak|old| Dist|ini)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # .env y variantes
+    RewriteRule (^|/)\.env - [F,L]
+
+    # Herramientas CLI (no deben ejecutarse por HTTP)
+    RewriteRule ^tools(/|$) - [F,L]
+
+    # Dependencias Composer
+    RewriteRule ^vendor(/|$) - [F,L]
+
+    # Configuración, Models y Services (solo Controllers vía HTTP)
+    RewriteRule ^app/config(/|$) - [F,L]
+    RewriteRule ^app/Models(/|$) - [F,L]
+    RewriteRule ^app/Services(/|$) - [F,L]
+
+    # Metadatos de proyecto
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|\.git)(/|$) - [F,L]
+</IfModule>
