@@ -32,7 +32,6 @@ if (!$sesionValida) {
 
 awr_csrf_token();
 
-
 $nombreCompleto = trim(
     ($_SESSION['nombres'] ?? '') . ' ' .
     ($_SESSION['apellidos'] ?? '')
@@ -95,26 +94,7 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>') ?>
                         <span>Bases de Datos</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
-                        <span>Reportes</span>
-                    </button>
-
-                    <p class="barra__grupo">Analítica</p>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 16 9 11l3 3 8-8"/><path d="M15 6h5v5"/>') ?>
-                        <span>Métricas de Rendimiento</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>') ?>
-                        <span>Logs y Trazas</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>') ?>
-                        <span>Alertas</span>
-                    </button>
-
-                    <p class="barra__grupo">Administración</p>
+<p class="barra__grupo">Administración</p>
                     <a class="barra__item" href="usuariosAccesosAdministrador.php">
                         <?= $icono('<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M5 20a7 7 0 0 1 14 0"/>') ?>
                         <span>Usuarios y Accesos</span>
@@ -131,11 +111,7 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>') ?>
                         <span>Portafolio Digital</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M8 4h8v16H8z"/><path d="M8 8H6M8 12H6M8 16H6M12 8h2M12 12h2"/>') ?>
-                        <span>Auditoría</span>
-                    </button>
-                </nav>
+</nav>
             </details>
             <p class="barra__nota">Maestro de clientes</p>
         </aside>

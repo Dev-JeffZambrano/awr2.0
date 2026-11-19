@@ -118,21 +118,10 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<path d="M4 7h16v12H4z"/><path d="M4 11h16M9 7V5h6v2"/>') ?>
                         <span>Stock en Agencia</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
-                        <span>Pedidos a Bodega Central</span>
-                    </button>
                     <a class="barra__item" href="ficheroClientes.php">
                         <?= $icono('<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M5 20a7 7 0 0 1 14 0"/>') ?>
                         <span>Fichero de Clientes</span>
                     </a>
-
-                    <p class="barra__grupo">Arquitectura AWR</p>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>') ?>
-                        <span>Modo Resiliente</span>
-                        <em id="modo-resiliente">…</em>
-                    </button>
                 </nav>
             </details>
             <p class="barra__nota" id="operaciones-pendientes">Operaciones pendientes: …</p>
@@ -180,7 +169,7 @@ $icono = static function (string $contenido): string {
                         <p class="jornada__meta" id="jornada-meta">Sucursal: … · Punto de emisión: …</p>
                     </div>
                     <div class="jornada__acciones">
-                        <button type="button" disabled>Consultar precios<span>Próximamente</span></button>
+                        <a href="catalogoPrecios.php">Consultar precios<span>Catálogo</span></a>
                         <a href="puntoVenta.php">Emitir factura<span>Punto de venta</span></a>
                     </div>
                 </section>
@@ -302,6 +291,6 @@ $icono = static function (string $contenido): string {
     </dialog>
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/seguridad.js"></script>
-    <script src="public/js/dashboardOperador.js?v=4"></script>
+    <script src="public/js/dashboardOperador.js?v=5"></script>
 </body>
 </html>

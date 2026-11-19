@@ -23,7 +23,7 @@ class VentaService
     private const TIPO_MOVIMIENTO = 'SALIDA_FACTURA';
     private const TOPIC_FACTURAS_CONFIRMADAS = 'awr.facturas.confirmadas';
     private const TOPIC_FACTURAS_PENDIENTES = 'awr.facturas.pendientes';
-    private const TIMEOUT_VENTA_MS = 3000;
+    private const TIMEOUT_VENTA_MS = 6000;
     private const CONSUMIDOR_FINAL = 'CONSUMIDOR_FINAL';
     private const LIMITE_BUSQUEDA = 15;
     private const LIMITE_LINEAS = 40;

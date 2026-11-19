@@ -149,7 +149,6 @@
         texto('tickets-nota', '');
         texto('total-cobrado', 'Total cobrado hoy: ' + (datos.totalCobrado || '$ 0,00'));
         texto('senal-sincronizacion', datos.sincronizacion || 'Pendiente');
-        texto('modo-resiliente', datos.modoResiliente || 'No disponible');
         pintarOperacionesPendientes(datos.operacionesPendientes);
         dibujarHoras(Array.isArray(datos.serie) ? datos.serie : []);
 

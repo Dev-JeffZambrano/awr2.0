@@ -63,7 +63,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Administrador | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardAdministrador.css?v=4">
+    <link rel="stylesheet" href="public/css/dashboardAdministrador.css?v=5">
 </head>
 <body>
     <div class="mando">
@@ -94,24 +94,6 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>') ?>
                         <span>Bases de Datos</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
-                        <span>Reportes</span>
-                    </button>
-
-                    <p class="barra__grupo">Analítica</p>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 16 9 11l3 3 8-8"/><path d="M15 6h5v5"/>') ?>
-                        <span>Métricas de Rendimiento</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>') ?>
-                        <span>Logs y Trazas</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>') ?>
-                        <span>Alertas</span>
-                    </button>
 
                     <p class="barra__grupo">Administración</p>
                     <a class="barra__item" href="usuariosAccesosAdministrador.php">
@@ -130,10 +112,6 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>') ?>
                         <span>Portafolio Digital</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M8 4h8v16H8z"/><path d="M8 8H6M8 12H6M8 16H6M12 8h2M12 12h2"/>') ?>
-                        <span>Auditoría</span>
-                    </button>
                 </nav>
             </details>
             <p class="barra__nota">Resumen operativo</p>
@@ -165,6 +143,13 @@ $icono = static function (string $contenido): string {
             <p class="tope__aviso" id="mensaje-sesion" role="alert" hidden></p>
 
             <main class="principal">
+                <div class="aviso-resiliencia" id="aviso-resiliencia" role="status" aria-live="polite" hidden>
+                    <div class="aviso-resiliencia__texto">
+                        <strong id="aviso-resiliencia-titulo">Operaciones pendientes de resiliencia</strong>
+                        <p id="aviso-resiliencia-detalle">Hay transacciones esperando reproceso en Redpanda.</p>
+                    </div>
+                    <a class="aviso-resiliencia__enlace" href="monitoreoAdministrador.php">Ver en Monitoreo</a>
+                </div>
                 <header class="encabezado">
                     <p class="migas">
                         <span>Centro de mando</span>
@@ -209,7 +194,7 @@ $icono = static function (string $contenido): string {
                             <p class="nota-pendiente" id="latencia-artificial-nota">Retardo configurado</p>
                             <div class="huella" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                         </article>
-                        <article class="tarjeta">
+                        <article class="tarjeta" id="tarjeta-facturas-pendientes">
                             <div class="tarjeta__cabeza">
                                 <h3>Facturas Pendientes</h3>
                                 <span class="insignia" id="facturas-pendientes-insignia">Resiliencia</span>
@@ -294,7 +279,7 @@ $icono = static function (string $contenido): string {
                 <div class="columnas">
                     <section class="panel" aria-labelledby="titulo-usuarios">
                         <div class="panel__cabeza">
-                            <h2 id="titulo-usuarios">Usuarios, Auditoría &amp; Seguridad</h2>
+                            <h2 id="titulo-usuarios">Usuarios &amp; Seguridad</h2>
                             <span class="insignia">PostgreSQL</span>
                         </div>
                         <ul class="lista">
@@ -312,14 +297,10 @@ $icono = static function (string $contenido): string {
                             <span class="insignia">PostgreSQL</span>
                         </div>
                         <div class="accesos">
-                            <button type="button" disabled>
-                                <span>Gestionar Usuarios y Cuentas</span>
-                                <strong id="acceso-usuarios">…</strong>
-                            </button>
-                            <button type="button" disabled>
-                                <span>Matriz de Roles y Permisos</span>
-                                <strong id="acceso-roles">…</strong>
-                            </button>
+                            <a href="usuariosAccesosAdministrador.php">
+                                <span>Usuarios y Accesos</span>
+                                <strong>Abrir</strong>
+                            </a>
                             <a href="configuracionAdministrador.php">
                                 <span>Configuración</span>
                                 <strong>Abrir</strong>
@@ -337,6 +318,6 @@ $icono = static function (string $contenido): string {
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/seguridad.js"></script>
     <script src="public/js/senalesAdministrador.js?v=2"></script>
-    <script src="public/js/dashboardAdministrador.js?v=9"></script>
+    <script src="public/js/dashboardAdministrador.js?v=12"></script>
 </body>
 </html>

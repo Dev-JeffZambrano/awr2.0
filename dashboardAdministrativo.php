@@ -63,7 +63,7 @@ $icono = static function (string $contenido): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard Administrativo | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/dashboardAdministrativo.css?v=2">
+    <link rel="stylesheet" href="public/css/dashboardAdministrativo.css?v=3">
 </head>
 <body>
     <div class="comercial">
@@ -90,24 +90,12 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<path d="M4 7h16M4 12h16M4 17h10"/>') ?>
                         <span>Catálogo &amp; Precios</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
-                        <span>Inventario Multibodega</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>') ?>
-                        <span>Pagos &amp; Caja</span>
-                    </button>
 
                     <p class="barra__grupo">Analítica</p>
                     <a class="barra__item" href="analiticaAdministrativo.php">
                         <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
                         <span>Analítica / Reportes BI</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 16 9 11l3 3 8-8"/><path d="M15 6h5v5"/>') ?>
-                        <span>Rentabilidad por Sucursal</span>
-                    </button>
                 </nav>
             </details>
         </aside>
@@ -154,7 +142,6 @@ $icono = static function (string $contenido): string {
                             </select>
                         </label>
                         <p class="filtros__estado" id="estado-carga" hidden>Actualizando…</p>
-                        <button class="filtros__principal" type="button" disabled title="Pendiente">Informe Ejecutivo · Pendiente</button>
                     </div>
                 </header>
 
@@ -282,7 +269,7 @@ $icono = static function (string $contenido): string {
                                 <h2 id="titulo-productos">Top productos</h2>
                                 <p>Unidades y ventas del período.</p>
                             </div>
-                            <button type="button" disabled>Ver catálogo</button>
+                            <a href="catalogoPreciosAdministrativo.php">Ver catálogo</a>
                         </div>
                         <div class="tabla-envoltorio">
                             <table class="tabla">
@@ -305,7 +292,6 @@ $icono = static function (string $contenido): string {
                                 <h2 id="titulo-stock">Stock bajo crítico</h2>
                                 <p>Productos con stock actual en o bajo el mínimo.</p>
                             </div>
-                            <button type="button" disabled>Generar orden</button>
                         </div>
                         <ul class="stock" id="lista-stock"></ul>
                     </section>

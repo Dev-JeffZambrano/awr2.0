@@ -32,7 +32,6 @@ if (!$sesionValida) {
 
 awr_csrf_token();
 
-
 $nombreCompleto = trim(
     ($_SESSION['nombres'] ?? '') . ' ' .
     ($_SESSION['apellidos'] ?? '')
@@ -119,22 +118,12 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<path d="M4 7h16v12H4z"/><path d="M4 11h16M9 7V5h6v2"/>') ?>
                         <span>Stock en Agencia</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
-                        <span>Pedidos a Bodega Central</span>
-                    </button>
-                    <a class="barra__item barra__item--actual" href="ficheroClientes.php" aria-current="page">
+<a class="barra__item barra__item--actual" href="ficheroClientes.php" aria-current="page">
                         <?= $icono('<path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M5 20a7 7 0 0 1 14 0"/>') ?>
                         <span>Fichero de Clientes</span>
                     </a>
 
-                    <p class="barra__grupo">Arquitectura AWR</p>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>') ?>
-                        <span>Modo Resiliente</span>
-                        <em id="modo-resiliente">…</em>
-                    </button>
-                </nav>
+</nav>
             </details>
             <p class="barra__nota">Consulta y registro de clientes</p>
         </aside>

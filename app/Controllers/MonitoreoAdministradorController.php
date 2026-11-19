@@ -70,6 +70,9 @@ awr_exigir_csrf(is_array($entrada) ? $entrada : []);
         case 'procesarFacturasPendientes':
             procesarFacturasPendientes($entrada);
             break;
+        case 'descartarFacturaPendiente':
+            descartarFacturaPendiente($entrada);
+            break;
         default:
             responder(400, [
                 'exito' => false,
@@ -187,6 +190,41 @@ function procesarFacturasPendientes(array $entrada): void
         ]);
     } catch (Throwable $e) {
         error_log('AWR procesarFacturasPendientes: ' . $e->getMessage());
+        responder(500, [
+            'exito' => false,
+            'mensaje' => 'No disponible',
+        ]);
+    }
+}
+
+function descartarFacturaPendiente(array $entrada): void
+{
+    exigirAdministradorMonitoreo();
+
+    $idOperacion = $entrada['id_operacion'] ?? null;
+
+    if (!is_string($idOperacion) || trim($idOperacion) === '') {
+        responder(400, [
+            'exito' => false,
+            'mensaje' => 'Datos incompletos.',
+        ]);
+    }
+
+    try {
+        $resultado = EstadoResilienciaService::descartarFacturaPendiente($idOperacion);
+        $resumen = EstadoResilienciaService::obtenerResumen();
+
+        responder(200, [
+            'exito' => true,
+            'resultado' => $resultado,
+            'resiliencia' => [
+                'disponible' => ($resumen['disponible'] ?? false) === true,
+                'facturas_pendientes' => $resumen['facturas_pendientes'] ?? null,
+                'nota' => $resumen['nota'] ?? 'No disponible',
+            ],
+        ]);
+    } catch (Throwable $e) {
+        error_log('AWR descartarFacturaPendiente: ' . $e->getMessage());
         responder(500, [
             'exito' => false,
             'mensaje' => 'No disponible',

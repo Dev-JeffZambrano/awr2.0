@@ -32,15 +32,19 @@ class EstadoResilienciaService
         $broker = null;
 
         try {
+            self::avanzarPrefijoResuelto();
+
             $broker = self::abrirBroker('awr-estado-resiliencia');
             $offsets = self::consultarOffsets($broker);
             $consumidor = self::consultarEstadoConsumidor($broker);
+            $cantidad = self::contarOperacionesSinFactura($offsets);
 
             return [
                 'disponible' => true,
                 'topic' => self::TOPIC_PENDIENTES,
                 'grupo' => self::GRUPO_CONSUMIDOR,
-                'facturas_pendientes' => $offsets['lag'],
+                'facturas_pendientes' => $cantidad,
+                'lag_topic' => $offsets['lag'],
                 'high_watermark' => $offsets['high_watermark'],
                 'committed_offset' => $offsets['committed_offset'],
                 'sin_offset_confirmado' => $offsets['sin_offset_confirmado'],
@@ -48,7 +52,7 @@ class EstadoResilienciaService
                     'estado' => 'Operativo',
                 ],
                 'consumidor' => $consumidor,
-                'nota' => $offsets['lag'] === 0
+                'nota' => $cantidad === 0
                     ? 'Sin operaciones pendientes'
                     : 'Operaciones esperando reproceso',
             ];
@@ -66,6 +70,8 @@ class EstadoResilienciaService
         $broker = null;
 
         try {
+            self::avanzarPrefijoResuelto();
+
             $broker = self::abrirBroker('awr-estado-resiliencia');
             $offsets = self::consultarOffsets($broker);
             $lag = $offsets['lag'];
@@ -74,6 +80,7 @@ class EstadoResilienciaService
                 return [
                     'disponible' => true,
                     'facturas_pendientes' => 0,
+                    'lag_topic' => 0,
                     'operaciones' => [],
                     'nota' => 'Sin operaciones pendientes',
                 ];
@@ -95,7 +102,8 @@ class EstadoResilienciaService
 
             return [
                 'disponible' => true,
-                'facturas_pendientes' => $lag,
+                'facturas_pendientes' => $visibles,
+                'lag_topic' => $lag,
                 'operaciones' => $operaciones,
                 'nota' => $visibles === 0
                     ? 'Sin operaciones pendientes'
@@ -109,6 +117,7 @@ class EstadoResilienciaService
             return [
                 'disponible' => false,
                 'facturas_pendientes' => null,
+                'lag_topic' => null,
                 'operaciones' => [],
                 'nota' => 'No disponible',
             ];
@@ -269,6 +278,117 @@ class EstadoResilienciaService
     }
 
     /**
+     * Descarta una operación pendiente que no puede reprocesarse.
+     * Solo permite descartar la primera de la cola para no saltar mensajes.
+     *
+     * @return array{
+     *   id_operacion:string,
+     *   estado:string,
+     *   mensaje:string,
+     *   id_factura:?int,
+     *   numero_comprobante:?string
+     * }
+     */
+    public static function descartarFacturaPendiente(string $idOperacion): array
+    {
+        $idOperacion = strtolower(trim($idOperacion));
+
+        if (!self::uuidValido($idOperacion)) {
+            return self::resultadoProceso($idOperacion, 'Error', 'Operación no válida', null, null);
+        }
+
+        $broker = null;
+
+        try {
+            $factura = self::facturaPorOperacion($idOperacion);
+
+            if ($factura !== null) {
+                self::avanzarPrefijoResuelto();
+
+                return self::resultadoProceso(
+                    $idOperacion,
+                    'Procesada',
+                    'La operación ya estaba confirmada.',
+                    (int) $factura->id_factura,
+                    (string) $factura->numero_comprobante
+                );
+            }
+
+            $broker = self::abrirBroker('awr-estado-resiliencia-descartar');
+            $offsets = self::consultarOffsets($broker);
+
+            if ($offsets['lag'] === 0) {
+                return self::resultadoProceso(
+                    $idOperacion,
+                    'Error',
+                    'La operación no está pendiente en Redpanda.',
+                    null,
+                    null
+                );
+            }
+
+            $mensajes = self::leerMensajesPendientes($offsets['inicio_pendiente'], 1);
+
+            if ($mensajes === []) {
+                return self::resultadoProceso(
+                    $idOperacion,
+                    'Error',
+                    'No se pudo leer la cola de pendientes.',
+                    null,
+                    null
+                );
+            }
+
+            $primero = $mensajes[0];
+
+            try {
+                $datos = json_decode($primero['value'], true, 32, JSON_THROW_ON_ERROR);
+            } catch (Throwable $e) {
+                $datos = null;
+            }
+
+            $idPrimero = is_array($datos) && is_string($datos['id_operacion'] ?? null)
+                ? strtolower(trim($datos['id_operacion']))
+                : '';
+
+            if ($idPrimero !== $idOperacion) {
+                return self::resultadoProceso(
+                    $idOperacion,
+                    'Error',
+                    'Solo se puede descartar la primera operación de la cola.',
+                    null,
+                    null
+                );
+            }
+
+            self::confirmarOffsetGrupo($broker, ((int) $primero['offset']) + 1);
+            self::cerrarBroker($broker);
+            $broker = null;
+            self::avanzarPrefijoResuelto();
+
+            return self::resultadoProceso(
+                $idOperacion,
+                'Descartada',
+                'Operación descartada de la cola de resiliencia.',
+                null,
+                null
+            );
+        } catch (Throwable $e) {
+            error_log('AWR EstadoResilienciaService descartarFacturaPendiente: ' . $e->getMessage());
+
+            return self::resultadoProceso(
+                $idOperacion,
+                'Error',
+                'No se pudo descartar la operación.',
+                null,
+                null
+            );
+        } finally {
+            self::cerrarBroker($broker);
+        }
+    }
+
+    /**
      * Cantidad de operaciones pendientes del topic filtradas por sucursal
      * (vía id_punto_emision → punto_emision.id_sucursal).
      *
@@ -287,6 +407,8 @@ class EstadoResilienciaService
         $broker = null;
 
         try {
+            self::avanzarPrefijoResuelto();
+
             $broker = self::abrirBroker('awr-estado-resiliencia-sucursal');
             $offsets = self::consultarOffsets($broker);
             $lag = $offsets['lag'];
@@ -374,6 +496,7 @@ class EstadoResilienciaService
             'topic' => self::TOPIC_PENDIENTES,
             'grupo' => self::GRUPO_CONSUMIDOR,
             'facturas_pendientes' => null,
+            'lag_topic' => null,
             'high_watermark' => null,
             'committed_offset' => null,
             'sin_offset_confirmado' => null,
@@ -386,6 +509,56 @@ class EstadoResilienciaService
             ],
             'nota' => 'No disponible',
         ];
+    }
+
+    /**
+     * Cuenta mensajes del lag que aún no tienen factura en PostgreSQL.
+     *
+     * @param array{
+     *   lag:int,
+     *   high_watermark:int,
+     *   committed_offset:int|null,
+     *   inicio_pendiente:int,
+     *   sin_offset_confirmado:bool
+     * } $offsets
+     */
+    private static function contarOperacionesSinFactura(array $offsets): int
+    {
+        $lag = $offsets['lag'];
+
+        if ($lag === 0) {
+            return 0;
+        }
+
+        $mensajes = self::leerMensajesPendientes(
+            $offsets['inicio_pendiente'],
+            min($lag, self::MAX_MENSAJES)
+        );
+        $cantidad = 0;
+
+        foreach ($mensajes as $mensaje) {
+            try {
+                $datos = json_decode($mensaje['value'], true, 32, JSON_THROW_ON_ERROR);
+            } catch (Throwable $e) {
+                $cantidad++;
+                continue;
+            }
+
+            if (!is_array($datos)) {
+                $cantidad++;
+                continue;
+            }
+
+            $id = is_string($datos['id_operacion'] ?? null)
+                ? strtolower(trim($datos['id_operacion']))
+                : '';
+
+            if ($id === '' || self::facturaPorOperacion($id) === null) {
+                $cantidad++;
+            }
+        }
+
+        return $cantidad;
     }
 
     private static function abrirBroker(string $clientId): Broker
@@ -619,6 +792,15 @@ class EstadoResilienciaService
 
     private static function avanzarPrefijoResuelto(): void
     {
+        for ($ronda = 0; $ronda < 20; $ronda++) {
+            if (!self::intentarAvanzarPrefijoResuelto()) {
+                return;
+            }
+        }
+    }
+
+    private static function intentarAvanzarPrefijoResuelto(): bool
+    {
         $broker = null;
 
         try {
@@ -628,7 +810,7 @@ class EstadoResilienciaService
             $lag = $offsets['lag'];
 
             if ($lag === 0) {
-                return;
+                return false;
             }
 
             $mensajes = self::leerMensajesPendientes($inicio, min($lag, self::MAX_MENSAJES));
@@ -656,11 +838,17 @@ class EstadoResilienciaService
                 $nuevoCommitted = $mensaje['offset'] + 1;
             }
 
-            if ($nuevoCommitted > $inicio) {
-                self::confirmarOffsetGrupo($broker, $nuevoCommitted);
+            if ($nuevoCommitted <= $inicio) {
+                return false;
             }
+
+            self::confirmarOffsetGrupo($broker, $nuevoCommitted);
+
+            return true;
         } catch (Throwable $e) {
             error_log('AWR EstadoResilienciaService avanzarPrefijoResuelto: ' . $e->getMessage());
+
+            return false;
         } finally {
             self::cerrarBroker($broker);
         }
@@ -924,6 +1112,7 @@ class EstadoResilienciaService
                 'cliente' => null,
                 'id_punto_emision' => self::enteroOpcional($datos['id_punto_emision'] ?? null),
                 'punto_emision' => null,
+                'sucursal' => null,
                 'id_metodo_pago' => self::enteroOpcional($datos['id_metodo_pago'] ?? null),
                 'metodo_pago' => null,
                 'cantidad_productos' => count($productosProyectados),
@@ -973,12 +1162,7 @@ class EstadoResilienciaService
                 'razon_social',
                 array_keys($idsCliente)
             );
-            $puntos = self::mapaConsulta(
-                'punto_emision',
-                'id_punto_emision',
-                'descripcion',
-                array_keys($idsPunto)
-            );
+            $puntos = self::mapaPuntosConSucursal(array_keys($idsPunto));
             $metodos = self::mapaConsulta(
                 'metodo_pago',
                 'id_metodo_pago',
@@ -1006,7 +1190,8 @@ class EstadoResilienciaService
                 $op['cliente'] = $clientes[$idCliente];
             }
             if (is_int($idPunto) && isset($puntos[$idPunto])) {
-                $op['punto_emision'] = $puntos[$idPunto];
+                $op['punto_emision'] = $puntos[$idPunto]['punto_emision'];
+                $op['sucursal'] = $puntos[$idPunto]['sucursal'];
             }
             if (is_int($idMetodo) && isset($metodos[$idMetodo])) {
                 $op['metodo_pago'] = $metodos[$idMetodo];
@@ -1025,6 +1210,45 @@ class EstadoResilienciaService
 
     /**
      * @param list<int|string> $ids
+     * @return array<int, array{punto_emision:string,sucursal:?string}>
+     */
+    private static function mapaPuntosConSucursal(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $filas = DB::table('punto_emision as pe')
+            ->leftJoin('sucursal as s', 's.id_sucursal', '=', 'pe.id_sucursal')
+            ->whereIn('pe.id_punto_emision', $ids)
+            ->get([
+                'pe.id_punto_emision',
+                'pe.descripcion',
+                's.nombre as nombre_sucursal',
+            ]);
+
+        $mapa = [];
+
+        foreach ($filas as $fila) {
+            $id = (int) $fila->id_punto_emision;
+            $punto = trim((string) $fila->descripcion);
+            $sucursal = trim((string) ($fila->nombre_sucursal ?? ''));
+
+            if ($punto === '') {
+                continue;
+            }
+
+            $mapa[$id] = [
+                'punto_emision' => $punto,
+                'sucursal' => $sucursal !== '' ? $sucursal : null,
+            ];
+        }
+
+        return $mapa;
+    }
+
+    /**
+     * @param list<int|string> $ids
      * @return array<int,string>
      */
     private static function mapaConsulta(string $tabla, string $columnaId, string $columnaNombre, array $ids): array
@@ -1035,7 +1259,6 @@ class EstadoResilienciaService
 
         $permitidas = [
             'cliente' => ['id_cliente', 'razon_social'],
-            'punto_emision' => ['id_punto_emision', 'descripcion'],
             'metodo_pago' => ['id_metodo_pago', 'nombre'],
             'producto' => ['id_producto', 'nombre'],
         ];

@@ -399,7 +399,9 @@
             return;
         }
 
-        var controles = modalLista.querySelectorAll('input[data-id-operacion], button[data-procesar]');
+        var controles = modalLista.querySelectorAll(
+            'input[data-id-operacion], button[data-procesar], button[data-descartar]'
+        );
 
         Array.prototype.forEach.call(controles, function (nodo) {
             nodo.disabled = activo;
@@ -453,7 +455,7 @@
         var thead = document.createElement('thead');
         var tbody = document.createElement('tbody');
         var filaCabeza = document.createElement('tr');
-        var encabezados = ['', 'ID operación', 'Fecha', 'Cliente', 'Punto de emisión', 'Productos', 'Estado', 'Acción'];
+        var encabezados = ['', 'ID operación', 'Fecha', 'Cliente', 'Sucursal / Punto', 'Productos', 'Estado', 'Acción'];
 
         encabezados.forEach(function (titulo) {
             var th = document.createElement('th');
@@ -476,6 +478,8 @@
                 : (operacion.id_punto_emision !== null && operacion.id_punto_emision !== undefined
                     ? String(operacion.id_punto_emision)
                     : 'No disponible');
+            var sucursal = operacion.sucursal ? String(operacion.sucursal) : '';
+            var puntoCompleto = sucursal !== '' ? (sucursal + ' · ' + punto) : punto;
             var idOperacion = texto(operacion.id_operacion);
 
             var tdCheck = document.createElement('td');
@@ -502,7 +506,7 @@
             tdCliente.textContent = cliente;
 
             var tdPunto = document.createElement('td');
-            tdPunto.textContent = punto;
+            tdPunto.textContent = puntoCompleto;
 
             var tdProductos = document.createElement('td');
             tdProductos.textContent = textoProductos(operacion.cantidad_productos);
@@ -515,6 +519,9 @@
             tdEstado.appendChild(spanEstado);
 
             var tdAccion = document.createElement('td');
+            var acciones = document.createElement('div');
+            acciones.className = 'resiliencia-modal__acciones-fila';
+
             var btnProcesar = document.createElement('button');
             btnProcesar.type = 'button';
             btnProcesar.className = 'resiliencia-modal__procesar';
@@ -523,7 +530,19 @@
             btnProcesar.addEventListener('click', function () {
                 procesarUna(idOperacion);
             });
-            tdAccion.appendChild(btnProcesar);
+
+            var btnDescartar = document.createElement('button');
+            btnDescartar.type = 'button';
+            btnDescartar.className = 'resiliencia-modal__descartar';
+            btnDescartar.setAttribute('data-descartar', idOperacion);
+            btnDescartar.textContent = 'Descartar';
+            btnDescartar.addEventListener('click', function () {
+                descartarUna(idOperacion);
+            });
+
+            acciones.appendChild(btnProcesar);
+            acciones.appendChild(btnDescartar);
+            tdAccion.appendChild(acciones);
 
             fila.appendChild(tdCheck);
             fila.appendChild(tdId);
@@ -565,13 +584,58 @@
             'resiliencia-modal__estado--error'
         );
 
-        if (resultado.estado === 'Procesada') {
+        if (resultado.estado === 'Procesada' || resultado.estado === 'Descartada') {
             span.classList.add('resiliencia-modal__estado--ok');
         } else if (resultado.estado === 'Sigue pendiente') {
             span.classList.add('resiliencia-modal__estado--aviso');
         } else {
             span.classList.add('resiliencia-modal__estado--error');
         }
+
+        if (typeof resultado.mensaje === 'string' && resultado.mensaje !== '' && modalAviso) {
+            modalAviso.hidden = false;
+            modalAviso.textContent = resultado.mensaje;
+        }
+    }
+
+    function descartarUna(idOperacion) {
+        if (procesoEnCurso || typeof axios === 'undefined') {
+            return;
+        }
+
+        if (!window.confirm('¿Descartar esta operación de la cola? No se emitirá factura.')) {
+            return;
+        }
+
+        setProcesandoUi(true);
+
+        axios.post('app/Controllers/MonitoreoAdministradorController.php', {
+            op: 'descartarFacturaPendiente',
+            id_operacion: idOperacion
+        }).then(function (respuesta) {
+            var datos = respuesta.data || {};
+
+            if (datos.exito !== true || !datos.resultado) {
+                if (modalAviso) {
+                    modalAviso.hidden = false;
+                    modalAviso.textContent = 'No disponible';
+                }
+
+                return;
+            }
+
+            aplicarResultadoEnFila(datos.resultado);
+            refrescarContadorResiliencia(datos.resiliencia);
+        }).catch(function () {
+            if (modalAviso) {
+                modalAviso.hidden = false;
+                modalAviso.textContent = 'No disponible';
+            }
+        }).finally(function () {
+            setProcesandoUi(false);
+            cargarListadoPendientes(false);
+            consultar();
+        });
     }
 
     function refrescarContadorResiliencia(bloque) {

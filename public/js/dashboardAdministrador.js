@@ -1,6 +1,12 @@
 (function () {
     var boton = document.getElementById('cerrar-sesion');
     var mensaje = document.getElementById('mensaje-sesion');
+    var avisoResiliencia = document.getElementById('aviso-resiliencia');
+    var avisoResilienciaTitulo = document.getElementById('aviso-resiliencia-titulo');
+    var avisoResilienciaDetalle = document.getElementById('aviso-resiliencia-detalle');
+    var tarjetaFacturasPendientes = document.getElementById('tarjeta-facturas-pendientes');
+    var resumenEnCurso = false;
+    var INTERVALO_RESUMEN_MS = 5000;
 
     var camposReales = [
         'sello-fuente',
@@ -17,8 +23,6 @@
         'usuarios-inhabilitados',
         'usuarios-roles',
         'usuarios-fallidos',
-        'acceso-usuarios',
-        'acceso-roles',
         'latencia-valor',
         'latencia-artificial-valor',
         'latencia-artificial-nota',
@@ -125,17 +129,53 @@
         return redpanda.broker + ':' + redpanda.puerto_kafka;
     }
 
+    function ocultarAvisoResiliencia() {
+        if (avisoResiliencia) {
+            avisoResiliencia.hidden = true;
+        }
+
+        if (tarjetaFacturasPendientes) {
+            tarjetaFacturasPendientes.classList.remove('tarjeta--alerta');
+        }
+    }
+
+    function mostrarAvisoResiliencia(cantidad) {
+        if (!avisoResiliencia || !avisoResilienciaTitulo || !avisoResilienciaDetalle) {
+            return;
+        }
+
+        var unidad = cantidad === 1 ? 'operación pendiente' : 'operaciones pendientes';
+
+        avisoResilienciaTitulo.textContent = cantidad === 1
+            ? '1 operación pendiente de resiliencia'
+            : cantidad + ' operaciones pendientes de resiliencia';
+        avisoResilienciaDetalle.textContent = 'Hay ' + cantidad + ' ' + unidad
+            + ' esperando reproceso en Redpanda.';
+        avisoResiliencia.hidden = false;
+
+        if (tarjetaFacturasPendientes) {
+            tarjetaFacturasPendientes.classList.add('tarjeta--alerta');
+        }
+    }
+
     function marcarNoDisponible() {
         camposReales.forEach(function (id) {
             escribir(id, 'No disponible');
         });
+        ocultarAvisoResiliencia();
     }
 
     function cargarResumen() {
+        if (resumenEnCurso) {
+            return;
+        }
+
         if (typeof axios === 'undefined') {
             marcarNoDisponible();
             return;
         }
+
+        resumenEnCurso = true;
 
         axios.post('app/Controllers/DashboardAdministradorController.php', {
             op: 'obtenerResumenAdministrador'
@@ -159,8 +199,6 @@
             escribir('usuarios-inhabilitados', String(usuarios.inhabilitados));
             escribir('usuarios-roles', usuarios.rolesTexto);
             escribir('usuarios-fallidos', String(datos.intentosFallidos));
-            escribir('acceso-usuarios', String(usuarios.total));
-            escribir('acceso-roles', String(datos.roles));
             var redpanda = datos.redpanda || {};
             var clickhouse = datos.clickhouse || {};
             var estadoRedpanda = estadoRecibido(redpanda.estado);
@@ -218,13 +256,22 @@
                         : 'Operaciones esperando reproceso'
                 );
                 escribir('facturas-pendientes-insignia', 'Resiliencia');
+
+                if (typeof facturasPendientes.cantidad === 'number' && facturasPendientes.cantidad > 0) {
+                    mostrarAvisoResiliencia(facturasPendientes.cantidad);
+                } else {
+                    ocultarAvisoResiliencia();
+                }
             } else {
                 escribir('facturas-pendientes-valor', 'No disponible');
                 escribir('facturas-pendientes-nota', 'No disponible');
                 escribir('facturas-pendientes-insignia', 'Resiliencia');
+                ocultarAvisoResiliencia();
             }
         }).catch(function () {
             marcarNoDisponible();
+        }).finally(function () {
+            resumenEnCurso = false;
         });
     }
 
@@ -251,7 +298,16 @@
         return true;
     }
 
+    function refrescarResumenAutomatico() {
+        if (document.hidden) {
+            return;
+        }
+
+        cargarResumen();
+    }
+
     cargarResumen();
+    window.setInterval(refrescarResumenAutomatico, INTERVALO_RESUMEN_MS);
 
     boton.addEventListener('click', function () {
         if (boton.disabled) {

@@ -32,7 +32,6 @@ if (!$sesionValida) {
 
 awr_csrf_token();
 
-
 $nombreCompleto = trim(
     ($_SESSION['nombres'] ?? '') . ' ' .
     ($_SESSION['apellidos'] ?? '')
@@ -91,25 +90,12 @@ $icono = static function (string $contenido): string {
                         <?= $icono('<path d="M4 7h16M4 12h16M4 17h10"/>') ?>
                         <span>Catálogo &amp; Precios</span>
                     </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M3 8 12 4l9 4-9 4-9-4Z"/><path d="M3 8v8l9 4 9-4V8"/>') ?>
-                        <span>Inventario Multibodega</span>
-                    </button>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>') ?>
-                        <span>Pagos &amp; Caja</span>
-                    </button>
-
-                    <p class="barra__grupo">Analítica</p>
+<p class="barra__grupo">Analítica</p>
                     <a class="barra__item" href="analiticaAdministrativo.php">
                         <?= $icono('<path d="M4 19V5M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/>') ?>
                         <span>Analítica / Reportes BI</span>
                     </a>
-                    <button class="barra__item" type="button" disabled>
-                        <?= $icono('<path d="M4 16 9 11l3 3 8-8"/><path d="M15 6h5v5"/>') ?>
-                        <span>Rentabilidad por Sucursal</span>
-                    </button>
-                </nav>
+</nav>
             </details>
         </aside>
 
@@ -261,12 +247,12 @@ $icono = static function (string $contenido): string {
                     <h3 id="detalle-comercial-titulo">Datos comerciales</h3>
                     <dl class="detalle__comercial">
                         <div>
-                            <dt>Precio</dt>
-                            <dd id="detalle-precio"></dd>
-                        </div>
-                        <div>
                             <dt>Costo</dt>
                             <dd id="detalle-costo"></dd>
+                        </div>
+                        <div>
+                            <dt>Precio</dt>
+                            <dd id="detalle-precio"></dd>
                         </div>
                         <div>
                             <dt>Margen bruto</dt>
@@ -359,11 +345,11 @@ $icono = static function (string $contenido): string {
                         <span id="etiqueta-aplica-iva">Con IVA</span>
                     </span>
                 </label>
-                <label>Precio
-                    <input id="campo-precio" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required>
-                </label>
                 <label>Costo
-                    <input id="campo-costo" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required>
+                    <input id="campo-costo" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required placeholder="Compra al proveedor">
+                </label>
+                <label>Precio
+                    <input id="campo-precio" type="text" inputmode="decimal" maxlength="16" autocomplete="off" required placeholder="Precio de venta">
                 </label>
                 <section class="formulario__sucursales" id="bloque-asignar-sucursales" aria-labelledby="titulo-asignar-sucursales" hidden>
                     <h3 id="titulo-asignar-sucursales">Asignar a sucursales</h3>
