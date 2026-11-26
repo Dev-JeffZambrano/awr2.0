@@ -994,8 +994,8 @@
         var etiqueta = nombreSucursal ? String(nombreSucursal) : 'esta sucursal';
 
         if (!idProducto || !idSucursal) {
-            return;
-        }
+                return;
+            }
 
         textoConfirma.textContent = '¿Desea quitar el producto de ' + etiqueta + '? Dejará de aparecer en el punto de venta de esa sucursal.';
         confirmarAccion = function () {

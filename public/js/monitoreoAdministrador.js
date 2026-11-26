@@ -22,6 +22,7 @@
     var procesoEnCurso = false;
     var intervaloMs = 5000;
     var operacionesPendientes = [];
+    var avisoProcesoPendiente = '';
 
     function escribir(id, valor) {
         var nodo = document.getElementById(id);
@@ -294,6 +295,25 @@
                     ? '1 miembro activo'
                     : entero(resiliencia.consumidor_miembros) + ' miembros activos')
         );
+    }
+
+    function mostrarAvisoModal(texto) {
+        if (!modalAviso || typeof texto !== 'string' || texto.trim() === '') {
+            return;
+        }
+
+        avisoProcesoPendiente = texto.trim();
+        modalAviso.hidden = false;
+        modalAviso.textContent = avisoProcesoPendiente;
+    }
+
+    function restaurarAvisoModal() {
+        if (!modalAviso || avisoProcesoPendiente === '') {
+            return;
+        }
+
+        modalAviso.hidden = false;
+        modalAviso.textContent = avisoProcesoPendiente;
     }
 
     function ocultarNodosModal() {
@@ -592,9 +612,8 @@
             span.classList.add('resiliencia-modal__estado--error');
         }
 
-        if (typeof resultado.mensaje === 'string' && resultado.mensaje !== '' && modalAviso) {
-            modalAviso.hidden = false;
-            modalAviso.textContent = resultado.mensaje;
+        if (typeof resultado.mensaje === 'string' && resultado.mensaje !== '') {
+            mostrarAvisoModal(resultado.mensaje);
         }
     }
 
@@ -616,21 +635,14 @@
             var datos = respuesta.data || {};
 
             if (datos.exito !== true || !datos.resultado) {
-                if (modalAviso) {
-                    modalAviso.hidden = false;
-                    modalAviso.textContent = 'No disponible';
-                }
-
+                mostrarAvisoModal('No se pudo descartar la operación. Intente nuevamente.');
                 return;
             }
 
             aplicarResultadoEnFila(datos.resultado);
             refrescarContadorResiliencia(datos.resiliencia);
         }).catch(function () {
-            if (modalAviso) {
-                modalAviso.hidden = false;
-                modalAviso.textContent = 'No disponible';
-            }
+            mostrarAvisoModal('No se pudo descartar la operación. Intente nuevamente.');
         }).finally(function () {
             setProcesandoUi(false);
             cargarListadoPendientes(false);
@@ -662,11 +674,7 @@
 
         if (typeof axios === 'undefined') {
             ocultarNodosModal();
-
-            if (modalAviso) {
-                modalAviso.hidden = false;
-                modalAviso.textContent = 'No disponible';
-            }
+            mostrarAvisoModal('No disponible');
 
             if (mostrarModal && modalPendientes && typeof modalPendientes.showModal === 'function') {
                 modalPendientes.showModal();
@@ -702,10 +710,11 @@
             ocultarNodosModal();
 
             if (datos.exito !== true || datos.disponible !== true) {
-                if (modalAviso) {
-                    modalAviso.hidden = false;
-                    modalAviso.textContent = 'No disponible';
-                }
+                mostrarAvisoModal(
+                    avisoProcesoPendiente !== ''
+                        ? avisoProcesoPendiente
+                        : 'No disponible'
+                );
 
                 if (modalNota) {
                     modalNota.textContent = 'No disponible';
@@ -725,17 +734,19 @@
                     modalVacio.hidden = false;
                 }
 
+                restaurarAvisoModal();
                 return;
             }
 
             pintarListaPendientes(operaciones);
+            restaurarAvisoModal();
         }).catch(function () {
             ocultarNodosModal();
-
-            if (modalAviso) {
-                modalAviso.hidden = false;
-                modalAviso.textContent = 'No disponible';
-            }
+            mostrarAvisoModal(
+                avisoProcesoPendiente !== ''
+                    ? avisoProcesoPendiente
+                    : 'No disponible'
+            );
 
             if (modalNota) {
                 modalNota.textContent = 'No disponible';
@@ -754,6 +765,7 @@
             return;
         }
 
+        avisoProcesoPendiente = '';
         cargarListadoPendientes(true);
     }
 
@@ -775,21 +787,18 @@
             var datos = respuesta.data || {};
 
             if (datos.exito !== true || !datos.resultado) {
-                if (modalAviso) {
-                    modalAviso.hidden = false;
-                    modalAviso.textContent = 'No disponible';
-                }
-
+                mostrarAvisoModal(
+                    'No se pudo subir la factura. Verifique la latencia de PostgreSQL e intente nuevamente.'
+                );
                 return;
             }
 
             aplicarResultadoEnFila(datos.resultado);
             refrescarContadorResiliencia(datos.resiliencia);
         }).catch(function () {
-            if (modalAviso) {
-                modalAviso.hidden = false;
-                modalAviso.textContent = 'No disponible';
-            }
+            mostrarAvisoModal(
+                'No se pudo subir la factura. Verifique la latencia de PostgreSQL e intente nuevamente.'
+            );
         }).finally(function () {
             setProcesandoUi(false);
             cargarListadoPendientes(false);
@@ -818,21 +827,18 @@
             var resultados = Array.isArray(datos.resultados) ? datos.resultados : [];
 
             if (datos.exito !== true) {
-                if (modalAviso) {
-                    modalAviso.hidden = false;
-                    modalAviso.textContent = 'No disponible';
-                }
-
+                mostrarAvisoModal(
+                    'No se pudieron subir las facturas. Verifique la latencia de PostgreSQL e intente nuevamente.'
+                );
                 return;
             }
 
             resultados.forEach(aplicarResultadoEnFila);
             refrescarContadorResiliencia(datos.resiliencia);
         }).catch(function () {
-            if (modalAviso) {
-                modalAviso.hidden = false;
-                modalAviso.textContent = 'No disponible';
-            }
+            mostrarAvisoModal(
+                'No se pudieron subir las facturas. Verifique la latencia de PostgreSQL e intente nuevamente.'
+            );
         }).finally(function () {
             setProcesandoUi(false);
             cargarListadoPendientes(false);

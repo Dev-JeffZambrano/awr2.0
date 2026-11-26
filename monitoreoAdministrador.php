@@ -379,6 +379,6 @@ $icono = static function (string $contenido): string {
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/seguridad.js"></script>
     <script src="public/js/senalesAdministrador.js?v=2"></script>
-    <script src="public/js/monitoreoAdministrador.js?v=7"></script>
+    <script src="public/js/monitoreoAdministrador.js?v=11"></script>
 </body>
 </html>

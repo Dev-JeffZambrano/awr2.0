@@ -53,7 +53,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Emitir factura | AWR</title>
     <link rel="stylesheet" href="public/css/variables.css">
-    <link rel="stylesheet" href="public/css/puntoVenta.css?v=7">
+    <link rel="stylesheet" href="public/css/puntoVenta.css?v=8">
 </head>
 <body>
     <main class="doc" role="dialog" aria-modal="true" aria-labelledby="titulo-emision">
@@ -214,7 +214,7 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
 
     <dialog class="exito cuentas-transferencia" id="cuentas-transferencia" aria-labelledby="titulo-cuentas-transferencia">
         <h2 id="titulo-cuentas-transferencia">Cuentas para transferencia</h2>
-        <p class="exito__nota">Elija la cuenta a la que realizó o realizará la transferencia.</p>
+        <p class="exito__nota" id="nota-cuentas-transferencia">Elija la cuenta a la que realizó o realizará la transferencia.</p>
         <ul class="cuentas-transferencia__lista" id="lista-cuentas-transferencia"></ul>
         <div class="exito__acciones">
             <button type="button" id="cerrar-cuentas-transferencia">Cerrar</button>
@@ -223,10 +223,10 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
 
     <dialog class="exito validar-transferencia" id="validar-transferencia" aria-labelledby="titulo-validar-transferencia">
         <h2 id="titulo-validar-transferencia">Validar transferencia</h2>
-        <p class="exito__nota">Confirme la cuenta y registre el número de comprobante.</p>
+        <p class="exito__nota" id="nota-validar-transferencia">Confirme la cuenta y registre el número de comprobante.</p>
         <dl class="validar-transferencia__resumen" id="resumen-cuenta-transferencia"></dl>
         <form id="form-validar-transferencia">
-            <label for="comprobante-transferencia">Número de comprobante</label>
+            <label for="comprobante-transferencia" id="etiqueta-comprobante-transferencia">Número de comprobante</label>
             <input
                 id="comprobante-transferencia"
                 name="comprobante_transferencia"
@@ -246,6 +246,6 @@ $nombreVisible = htmlspecialchars((string) $nombreCompleto, ENT_QUOTES, 'UTF-8')
 
     <script src="public/js/axios.min.js"></script>
     <script src="public/js/seguridad.js"></script>
-    <script src="public/js/puntoVenta.js?v=7"></script>
+    <script src="public/js/puntoVenta.js?v=10"></script>
 </body>
 </html>

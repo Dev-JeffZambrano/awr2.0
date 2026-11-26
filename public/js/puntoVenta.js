@@ -19,11 +19,16 @@
     var confirmar = document.getElementById('confirmar-venta');
     var dialogo = document.getElementById('resultado-venta');
     var dialogoTransferencia = document.getElementById('cuentas-transferencia');
+    var tituloCuentasTransferencia = document.getElementById('titulo-cuentas-transferencia');
+    var notaCuentasTransferencia = document.getElementById('nota-cuentas-transferencia');
     var listaCuentasTransferencia = document.getElementById('lista-cuentas-transferencia');
     var cerrarCuentasTransferencia = document.getElementById('cerrar-cuentas-transferencia');
     var dialogoValidarTransferencia = document.getElementById('validar-transferencia');
+    var tituloValidarTransferencia = document.getElementById('titulo-validar-transferencia');
+    var notaValidarTransferencia = document.getElementById('nota-validar-transferencia');
     var resumenCuentaTransferencia = document.getElementById('resumen-cuenta-transferencia');
     var formValidarTransferencia = document.getElementById('form-validar-transferencia');
+    var etiquetaComprobanteTransferencia = document.getElementById('etiqueta-comprobante-transferencia');
     var inputComprobanteTransferencia = document.getElementById('comprobante-transferencia');
     var avisoComprobanteTransferencia = document.getElementById('aviso-comprobante-transferencia');
     var cancelarValidarTransferencia = document.getElementById('cancelar-validar-transferencia');
@@ -66,6 +71,7 @@
             identificacion: '1792564839001'
         }
     ];
+    var marcasTarjeta = ['Visa', 'Mastercard'];
     var descuentoOpcion = document.getElementById('descuento-opcion');
     var descuentoOtroCaja = document.getElementById('descuento-otro-caja');
     var descuentoOtro = document.getElementById('descuento-otro');
@@ -75,8 +81,11 @@
     var cliente = null;
     var metodoId = 0;
     var metodoEsTransferencia = false;
+    var metodoEsTarjeta = false;
     var transferenciaValidada = null;
+    var tarjetaValidada = null;
     var cuentaTransferenciaPendiente = null;
+    var tarjetaPendiente = null;
     var puntoId = 0;
     var carrito = [];
     var cotizacion = null;
@@ -285,6 +294,9 @@
         var transferenciaOk = !metodoEsTransferencia
             || (transferenciaValidada
                 && String(transferenciaValidada.comprobante || '').trim() !== '');
+        var tarjetaOk = !metodoEsTarjeta
+            || (tarjetaValidada
+                && String(tarjetaValidada.comprobante || '').trim() !== '');
         return !confirmando
             && !enProceso
             && carrito.length > 0
@@ -293,7 +305,8 @@
             && metodoId > 0
             && puntoId > 0
             && descuentoInfo.valido
-            && transferenciaOk;
+            && transferenciaOk
+            && tarjetaOk;
     }
 
     function actualizarConfirmar() {
@@ -386,6 +399,31 @@
         return td;
     }
 
+    function actualizarEstadoMetodosPago() {
+        if (!metodosCaja) {
+            return;
+        }
+        var conArticulos = carrito.length > 0;
+        var habilitados = conArticulos && !confirmando;
+        metodosCaja.querySelectorAll('button').forEach(function (boton) {
+            boton.disabled = !habilitados;
+        });
+        if (conArticulos || metodoId === 0) {
+            return;
+        }
+        metodoId = 0;
+        metodoEsTransferencia = false;
+        metodoEsTarjeta = false;
+        limpiarValidacionPago();
+        cerrarDialogoValidarTransferencia();
+        cerrarDialogoTransferencia();
+        metodosCaja.querySelectorAll('button').forEach(function (boton) {
+            boton.classList.remove('opcion--activa');
+            boton.setAttribute('aria-checked', 'false');
+        });
+        mostrarResumenValidacionPago();
+    }
+
     function pintarCarrito() {
         limpiar(lineas);
         cuentaCarrito();
@@ -397,6 +435,7 @@
             td.textContent = 'Agrega productos para comenzar la venta';
             vacio.appendChild(td);
             lineas.appendChild(vacio);
+            actualizarEstadoMetodosPago();
             actualizarConfirmar();
             return;
         }
@@ -465,6 +504,7 @@
             celda(fila).appendChild(quitar);
             lineas.appendChild(fila);
         });
+        actualizarEstadoMetodosPago();
         actualizarConfirmar();
     }
 
@@ -801,30 +841,38 @@
         return codigo === 'TRANSFERENCIA' || nombre.indexOf('transferencia') !== -1;
     }
 
-    function limpiarTransferenciaValidada() {
+    function esTarjeta(metodo) {
+        var codigo = String(metodo.codigo || '').toUpperCase();
+        var nombre = String(metodo.nombre || '').toLowerCase();
+        return codigo === 'TARJETA' || nombre.indexOf('tarjeta') !== -1;
+    }
+
+    function limpiarValidacionPago() {
         transferenciaValidada = null;
+        tarjetaValidada = null;
         cuentaTransferenciaPendiente = null;
+        tarjetaPendiente = null;
         if (inputComprobanteTransferencia) {
             inputComprobanteTransferencia.value = '';
         }
         if (avisoComprobanteTransferencia) {
             avisoComprobanteTransferencia.hidden = true;
         }
-        mostrarResumenTransferencia();
+        mostrarResumenValidacionPago();
     }
 
-    function mostrarResumenTransferencia() {
+    function mostrarResumenValidacionPago() {
         if (!pagoTransferenciaResumen) {
             return;
         }
-        if (!metodoEsTransferencia) {
+        if (!metodoEsTransferencia && !metodoEsTarjeta) {
             pagoTransferenciaResumen.hidden = true;
             pagoTransferenciaResumen.textContent = '';
             pagoTransferenciaResumen.classList.remove('pago-validacion--pendiente');
             return;
         }
         pagoTransferenciaResumen.hidden = false;
-        if (transferenciaValidada) {
+        if (metodoEsTransferencia && transferenciaValidada) {
             pagoTransferenciaResumen.classList.remove('pago-validacion--pendiente');
             pagoTransferenciaResumen.textContent = 'Transferencia validada: '
                 + transferenciaValidada.banco
@@ -832,8 +880,20 @@
                 + transferenciaValidada.comprobante;
             return;
         }
+        if (metodoEsTarjeta && tarjetaValidada) {
+            pagoTransferenciaResumen.classList.remove('pago-validacion--pendiente');
+            pagoTransferenciaResumen.textContent = 'Tarjeta validada: '
+                + tarjetaValidada.banco
+                + ' · '
+                + tarjetaValidada.marca
+                + ' · voucher '
+                + tarjetaValidada.comprobante;
+            return;
+        }
         pagoTransferenciaResumen.classList.add('pago-validacion--pendiente');
-        pagoTransferenciaResumen.textContent = 'Elija una cuenta e ingrese el número de comprobante para validar el pago.';
+        pagoTransferenciaResumen.textContent = metodoEsTarjeta
+            ? 'Elija banco y marca (Visa o Mastercard) e ingrese el Número de Voucher.'
+            : 'Elija una cuenta e ingrese el número de comprobante para validar el pago.';
     }
 
     function pintarFilasCuenta(contenedor, pares) {
@@ -850,13 +910,83 @@
         });
     }
 
-    function pintarCuentasTransferencia() {
+    function configurarTextosDialogoPago() {
+        if (tituloCuentasTransferencia) {
+            tituloCuentasTransferencia.textContent = metodoEsTarjeta
+                ? 'Bancos para pago con tarjeta'
+                : 'Cuentas para transferencia';
+        }
+        if (notaCuentasTransferencia) {
+            notaCuentasTransferencia.textContent = metodoEsTarjeta
+                ? 'Elija el banco y la marca de tarjeta (Visa o Mastercard).'
+                : 'Elija la cuenta a la que realizó o realizará la transferencia.';
+        }
+        if (tituloValidarTransferencia) {
+            tituloValidarTransferencia.textContent = metodoEsTarjeta
+                ? 'Validar pago con tarjeta'
+                : 'Validar transferencia';
+        }
+        if (notaValidarTransferencia) {
+            notaValidarTransferencia.textContent = metodoEsTarjeta
+                ? 'Confirme banco y marca, y registre el Número de Voucher.'
+                : 'Confirme la cuenta y registre el número de comprobante.';
+        }
+        if (etiquetaComprobanteTransferencia) {
+            etiquetaComprobanteTransferencia.textContent = metodoEsTarjeta
+                ? 'Número de Voucher'
+                : 'Número de comprobante';
+        }
+        if (inputComprobanteTransferencia) {
+            inputComprobanteTransferencia.placeholder = metodoEsTarjeta
+                ? 'Ej. VOUCHER-12345'
+                : 'Ej. COMP-12345';
+        }
+        if (avisoComprobanteTransferencia) {
+            avisoComprobanteTransferencia.textContent = metodoEsTarjeta
+                ? 'Ingrese el Número de Voucher.'
+                : 'Ingrese el número de comprobante.';
+        }
+    }
+
+    function pintarOpcionesPagoBancos() {
         if (!listaCuentasTransferencia) {
             return;
         }
-        if (listaCuentasTransferencia.childElementCount > 0) {
+        limpiar(listaCuentasTransferencia);
+
+        if (metodoEsTarjeta) {
+            cuentasTransferencia.forEach(function (cuenta) {
+                var item = document.createElement('li');
+                item.className = 'cuentas-transferencia__banco-bloque';
+
+                var banco = document.createElement('p');
+                banco.className = 'cuentas-transferencia__banco';
+                banco.textContent = cuenta.banco;
+                item.appendChild(banco);
+
+                var marcas = document.createElement('div');
+                marcas.className = 'cuentas-transferencia__marcas';
+                marcas.setAttribute('role', 'group');
+                marcas.setAttribute('aria-label', 'Marcas de tarjeta para ' + cuenta.banco);
+
+                marcasTarjeta.forEach(function (marca) {
+                    var boton = document.createElement('button');
+                    boton.type = 'button';
+                    boton.className = 'cuentas-transferencia__marca';
+                    boton.textContent = marca;
+                    boton.setAttribute('aria-label', marca + ' · ' + cuenta.banco);
+                    boton.addEventListener('click', function () {
+                        abrirValidarTarjeta(cuenta.banco, marca);
+                    });
+                    marcas.appendChild(boton);
+                });
+
+                item.appendChild(marcas);
+                listaCuentasTransferencia.appendChild(item);
+            });
             return;
         }
+
         cuentasTransferencia.forEach(function (cuenta, indice) {
             var item = document.createElement('li');
             var boton = document.createElement('button');
@@ -886,11 +1016,12 @@
         });
     }
 
-    function mostrarCuentasTransferencia() {
+    function mostrarDialogoBancosPago() {
         if (!dialogoTransferencia) {
             return;
         }
-        pintarCuentasTransferencia();
+        configurarTextosDialogoPago();
+        pintarOpcionesPagoBancos();
         if (!dialogoTransferencia.open) {
             dialogoTransferencia.showModal();
         }
@@ -908,22 +1039,12 @@
         }
     }
 
-    function abrirValidarTransferencia(cuenta) {
-        if (!dialogoValidarTransferencia || !resumenCuentaTransferencia) {
+    function prepararInputComprobante(valorPrevio) {
+        if (!dialogoValidarTransferencia) {
             return;
         }
-        cuentaTransferenciaPendiente = cuenta;
-        pintarFilasCuenta(resumenCuentaTransferencia, [
-            ['Banco', cuenta.banco],
-            ['Tipo', cuenta.tipo],
-            ['Número', cuenta.numero],
-            ['Titular', cuenta.titular]
-        ]);
         if (inputComprobanteTransferencia) {
-            inputComprobanteTransferencia.value = transferenciaValidada
-                && transferenciaValidada.numero === cuenta.numero
-                ? String(transferenciaValidada.comprobante || '')
-                : '';
+            inputComprobanteTransferencia.value = valorPrevio || '';
             inputComprobanteTransferencia.setCustomValidity('');
         }
         if (avisoComprobanteTransferencia) {
@@ -940,8 +1061,49 @@
         }
     }
 
-    function confirmarValidacionTransferencia() {
-        if (!cuentaTransferenciaPendiente || !inputComprobanteTransferencia) {
+    function abrirValidarTransferencia(cuenta) {
+        if (!dialogoValidarTransferencia || !resumenCuentaTransferencia) {
+            return;
+        }
+        tarjetaPendiente = null;
+        cuentaTransferenciaPendiente = cuenta;
+        configurarTextosDialogoPago();
+        pintarFilasCuenta(resumenCuentaTransferencia, [
+            ['Banco', cuenta.banco],
+            ['Tipo', cuenta.tipo],
+            ['Número', cuenta.numero],
+            ['Titular', cuenta.titular]
+        ]);
+        prepararInputComprobante(
+            transferenciaValidada
+                && transferenciaValidada.numero === cuenta.numero
+                ? String(transferenciaValidada.comprobante || '')
+                : ''
+        );
+    }
+
+    function abrirValidarTarjeta(banco, marca) {
+        if (!dialogoValidarTransferencia || !resumenCuentaTransferencia) {
+            return;
+        }
+        cuentaTransferenciaPendiente = null;
+        tarjetaPendiente = { banco: banco, marca: marca };
+        configurarTextosDialogoPago();
+        pintarFilasCuenta(resumenCuentaTransferencia, [
+            ['Banco', banco],
+            ['Marca', marca]
+        ]);
+        prepararInputComprobante(
+            tarjetaValidada
+                && tarjetaValidada.banco === banco
+                && tarjetaValidada.marca === marca
+                ? String(tarjetaValidada.comprobante || '')
+                : ''
+        );
+    }
+
+    function confirmarValidacionPago() {
+        if (!inputComprobanteTransferencia) {
             return false;
         }
         var comprobante = String(inputComprobanteTransferencia.value || '').trim();
@@ -955,17 +1117,32 @@
         if (avisoComprobanteTransferencia) {
             avisoComprobanteTransferencia.hidden = true;
         }
-        transferenciaValidada = {
-            banco: cuentaTransferenciaPendiente.banco,
-            tipo: cuentaTransferenciaPendiente.tipo,
-            numero: cuentaTransferenciaPendiente.numero,
-            titular: cuentaTransferenciaPendiente.titular,
-            comprobante: comprobante.slice(0, 50)
-        };
-        cuentaTransferenciaPendiente = null;
+
+        if (metodoEsTarjeta && tarjetaPendiente) {
+            tarjetaValidada = {
+                banco: tarjetaPendiente.banco,
+                marca: tarjetaPendiente.marca,
+                comprobante: comprobante.slice(0, 50)
+            };
+            transferenciaValidada = null;
+            tarjetaPendiente = null;
+        } else if (metodoEsTransferencia && cuentaTransferenciaPendiente) {
+            transferenciaValidada = {
+                banco: cuentaTransferenciaPendiente.banco,
+                tipo: cuentaTransferenciaPendiente.tipo,
+                numero: cuentaTransferenciaPendiente.numero,
+                titular: cuentaTransferenciaPendiente.titular,
+                comprobante: comprobante.slice(0, 50)
+            };
+            tarjetaValidada = null;
+            cuentaTransferenciaPendiente = null;
+        } else {
+            return false;
+        }
+
         cerrarDialogoValidarTransferencia();
         cerrarDialogoTransferencia();
-        mostrarResumenTransferencia();
+        mostrarResumenValidacionPago();
         actualizarConfirmar();
         return true;
     }
@@ -974,7 +1151,8 @@
         limpiar(metodosCaja);
         metodoId = 0;
         metodoEsTransferencia = false;
-        limpiarTransferenciaValidada();
+        metodoEsTarjeta = false;
+        limpiarValidacionPago();
         var metodos = (contexto.metodosPago || []).filter(function (metodo) {
             return String(metodo.codigo || '').toUpperCase() !== 'OTRO';
         });
@@ -986,34 +1164,43 @@
             boton.setAttribute('aria-checked', 'false');
             boton.textContent = metodo.nombre;
             boton.addEventListener('click', function () {
-                if (confirmando) {
+                if (confirmando || carrito.length === 0) {
                     return;
                 }
                 var eraTransferencia = metodoEsTransferencia;
+                var eraTarjeta = metodoEsTarjeta;
                 var ahoraTransferencia = esTransferencia(metodo);
+                var ahoraTarjeta = esTarjeta(metodo);
                 metodoId = metodo.id;
                 metodoEsTransferencia = ahoraTransferencia;
+                metodoEsTarjeta = ahoraTarjeta;
                 metodosCaja.querySelectorAll('button').forEach(function (item) {
                     var activo = item === boton;
                     item.classList.toggle('opcion--activa', activo);
                     item.setAttribute('aria-checked', activo ? 'true' : 'false');
                 });
-                if (!ahoraTransferencia) {
-                    limpiarTransferenciaValidada();
+                if (!ahoraTransferencia && !ahoraTarjeta) {
+                    limpiarValidacionPago();
                     cerrarDialogoValidarTransferencia();
                     cerrarDialogoTransferencia();
                 } else {
-                    if (!eraTransferencia) {
-                        limpiarTransferenciaValidada();
+                    if (
+                        (ahoraTransferencia && !eraTransferencia)
+                        || (ahoraTarjeta && !eraTarjeta)
+                        || (ahoraTransferencia && eraTarjeta)
+                        || (ahoraTarjeta && eraTransferencia)
+                    ) {
+                        limpiarValidacionPago();
                     }
-                    mostrarResumenTransferencia();
-                    mostrarCuentasTransferencia();
+                    mostrarResumenValidacionPago();
+                    mostrarDialogoBancosPago();
                 }
                 actualizarConfirmar();
             });
             metodosCaja.appendChild(boton);
         });
-        if (metodos.length === 1) {
+        actualizarEstadoMetodosPago();
+        if (metodos.length === 1 && carrito.length > 0) {
             metodosCaja.querySelector('button').click();
         }
     }
@@ -1049,7 +1236,8 @@
         limpiar(resultadosClientes);
         cliente = contexto ? contexto.consumidorFinal : null;
         metodoEsTransferencia = false;
-        limpiarTransferenciaValidada();
+        metodoEsTarjeta = false;
+        limpiarValidacionPago();
         cerrarDialogoValidarTransferencia();
         cerrarDialogoTransferencia();
         if (descuentoOpcion) {
@@ -1139,6 +1327,8 @@
         if (!puedeConfirmar() || !totales || !totales.descuentoValido) {
             if (metodoEsTransferencia && !transferenciaValidada) {
                 mostrarAviso('Valide la transferencia: elija una cuenta e ingrese el número de comprobante.');
+            } else if (metodoEsTarjeta && !tarjetaValidada) {
+                mostrarAviso('Valide el pago con tarjeta: elija banco, Visa o Mastercard, e ingrese el Número de Voucher.');
             } else {
                 mostrarAviso(!totales || !totales.descuentoValido
                     ? 'Revise el porcentaje de descuento (0 a 100).'
@@ -1181,6 +1371,18 @@
                 + transferenciaValidada.numero
                 + ' | '
                 + transferenciaValidada.comprobante;
+        }
+        if (metodoEsTarjeta && tarjetaValidada) {
+            payload.tarjeta = {
+                banco: tarjetaValidada.banco,
+                marca: tarjetaValidada.marca,
+                comprobante: tarjetaValidada.comprobante
+            };
+            payload.referencia_pago = tarjetaValidada.banco
+                + ' | '
+                + tarjetaValidada.marca
+                + ' | '
+                + tarjetaValidada.comprobante;
         }
         post(payload).then(function (respuesta) {
             var datos = respuesta.data || {};
@@ -1280,13 +1482,14 @@
     if (cancelarValidarTransferencia) {
         cancelarValidarTransferencia.addEventListener('click', function () {
             cuentaTransferenciaPendiente = null;
+            tarjetaPendiente = null;
             cerrarDialogoValidarTransferencia();
         });
     }
     if (formValidarTransferencia) {
         formValidarTransferencia.addEventListener('submit', function (evento) {
             evento.preventDefault();
-            confirmarValidacionTransferencia();
+            confirmarValidacionPago();
         });
     }
     if (inputComprobanteTransferencia) {
@@ -1300,6 +1503,7 @@
         dialogoValidarTransferencia.addEventListener('cancel', function (evento) {
             evento.preventDefault();
             cuentaTransferenciaPendiente = null;
+            tarjetaPendiente = null;
             cerrarDialogoValidarTransferencia();
         });
     }

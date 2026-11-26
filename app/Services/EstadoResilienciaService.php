@@ -208,7 +208,7 @@ class EstadoResilienciaService
                 return self::resultadoProceso(
                     $idOperacion,
                     'Sigue pendiente',
-                    'PostgreSQL no confirmó la operación.',
+                    self::mensajeNoConfirmadaPorLatencia($e->getMessage()),
                     null,
                     null
                 );
@@ -239,7 +239,7 @@ class EstadoResilienciaService
             return self::resultadoProceso(
                 $idOperacion,
                 'Sigue pendiente',
-                'PostgreSQL no confirmó la operación.',
+                self::mensajeNoConfirmadaPorLatencia(null),
                 null,
                 null
             );
@@ -248,6 +248,29 @@ class EstadoResilienciaService
 
             return self::resultadoProceso($idOperacion, 'Error', 'No se pudo procesar la operación.', null, null);
         }
+    }
+
+    private static function mensajeNoConfirmadaPorLatencia(?string $detalle): string
+    {
+        $base = 'No se pudo subir la factura: PostgreSQL aún presenta latencia o no responde a tiempo. '
+            . 'La operación sigue pendiente; reintente cuando baje la latencia.';
+
+        if (!is_string($detalle) || $detalle === '') {
+            return $base;
+        }
+
+        $detalleNormalizado = strtolower($detalle);
+
+        if (
+            str_contains($detalleNormalizado, 'tiempo')
+            || str_contains($detalleNormalizado, 'timeout')
+            || str_contains($detalleNormalizado, 'agotado')
+        ) {
+            return 'No se pudo subir la factura: el tiempo de confirmación se agotó por latencia en PostgreSQL. '
+                . 'La operación sigue pendiente; reintente cuando baje la latencia.';
+        }
+
+        return $base;
     }
 
     /**

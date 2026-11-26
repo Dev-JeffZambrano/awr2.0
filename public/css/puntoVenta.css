@@ -835,6 +835,47 @@ td {
     color: var(--color-texto);
 }
 
+.cuentas-transferencia__banco-bloque {
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid #edf2f8;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+}
+
+.cuentas-transferencia__marcas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.cuentas-transferencia__marca {
+    margin: 0;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid #d7e3f2;
+    border-radius: 0.55rem;
+    background: #fff;
+    color: var(--color-texto);
+    font: inherit;
+    font-weight: var(--peso-medio);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cuentas-transferencia__marca:hover {
+    border-color: #c5d8ef;
+    background: #f1f6fc;
+}
+
+.cuentas-transferencia__marca:focus {
+    outline: none;
+}
+
+.cuentas-transferencia__marca:focus-visible {
+    border-color: var(--color-primario);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+
 .cuentas-transferencia__item dl,
 .validar-transferencia__resumen {
     margin: 0;
