@@ -6,3 +6,9 @@ tools/clickhouse/powerbi-reader.xml
 .DS_Store
 Thumbs.db
 .cursor/mcp.json
+
+# Tesis / videos / anexos (no van al código)
+/documentacion/
+*.mp4
+*.pptx
+*.pbix
